@@ -3,6 +3,12 @@ import dotenv from "dotenv";
 import commentRouter from "./routes/instagram/comment";
 import axios from "axios";
 import qs from "qs";
+import {
+  getAccessToken,
+  getLongLivedAccessToken,
+  refreshAccessToken,
+  saveAccessTokenToRedis,
+} from "./utils/tokenManager";
 dotenv.config();
 
 const app = express();
@@ -170,19 +176,54 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
 
 // Function to handle comments via agent (or controller)
-async function handleCommentAgent(
+export async function handleCommentAgent(
   commentText: string,
   commentId: string
 ): Promise<void> {
-  // Example placeholder for your comment handling logic
+  console.log(`💬 Processing comment: ${commentText} with ID: ${commentId}`);
+  const lastCommentId = "17955336836948354";
 
-  console.log(`Processing comment: ${commentText} with ID: ${commentId}`);
+  const message = "Terima kasih atas komentarnya!";
 
-  const lastCommentid = "17955336836948354";
-  const url = `https://graph.facebook.com/v22.0/${lastCommentid}/replies?message=Terima kasih atas komentarnya!&access_token=${process.env.ACCESS_TOKEN}`;
-  await axios.post(url, {
-    message: "Terima kasih atas komentarnya!",
-  });
-  console.log("Comment replied successfully!");
-  // You can add your logic to reply to the comment using your AI agent here
+  let accessToken = await getAccessToken();
+
+  if (!accessToken) {
+    console.error("❌ No access token available.");
+    return;
+  }
+
+  const url = `https://graph.facebook.com/v12.0/${lastCommentId}/replies`;
+
+  try {
+    await axios.post(url, {
+      message,
+      access_token: accessToken,
+    });
+    console.log("✅ Comment replied successfully!");
+  } catch (error: any) {
+    const err = error.response?.data?.error;
+    if (err?.code === 190) {
+      console.warn("⚠️ Token expired. Attempting refresh...");
+
+      try {
+        const refreshedToken = await refreshAccessToken();
+        if (!refreshedToken) throw new Error("Gagal refresh token");
+
+        await saveAccessTokenToRedis(refreshedToken);
+        accessToken = refreshedToken;
+
+        // Retry post
+        await axios.post(url, {
+          message,
+          access_token: accessToken,
+        });
+
+        console.log("✅ Comment replied successfully with refreshed token!");
+      } catch (refreshError) {
+        console.error("❌ Failed to refresh token and reply:", refreshError);
+      }
+    } else {
+      console.error("❌ Error replying comment:", err || error);
+    }
+  }
 }

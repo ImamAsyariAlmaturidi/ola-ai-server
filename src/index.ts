@@ -9,6 +9,7 @@ import {
   refreshAccessToken,
   saveAccessTokenToRedis,
 } from "./utils/tokenManager";
+import { getCommentReply } from "./agent/handlres/instagram/commentAgent";
 dotenv.config();
 
 const app = express();
@@ -181,10 +182,10 @@ export async function handleCommentAgent(
   commentId: string
 ): Promise<void> {
   console.log(`💬 Processing comment: ${commentText} with ID: ${commentId}`);
-  const lastCommentId = "17955336836948354";
+  const lastCommentId = "18075388996889349";
 
-  const message = "Terima kasih atas komentarnya!";
-
+  const replyMessageFromAI = await getCommentReply(commentText);
+  console.log(replyMessageFromAI);
   let accessToken = await getAccessToken();
 
   if (!accessToken) {
@@ -196,7 +197,7 @@ export async function handleCommentAgent(
 
   try {
     await axios.post(url, {
-      message,
+      message: replyMessageFromAI,
       access_token: accessToken,
     });
     console.log("✅ Comment replied successfully!");
@@ -214,7 +215,7 @@ export async function handleCommentAgent(
 
         // Retry post
         await axios.post(url, {
-          message,
+          message: replyMessageFromAI,
           access_token: accessToken,
         });
 

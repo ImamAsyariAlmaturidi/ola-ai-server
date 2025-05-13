@@ -1,0 +1,18 @@
+[
+  {
+    "store_id": "nike-corner",
+    "store_name": "Nike Corner",
+    "description": "Nike Corner adalah toko sepatu resmi yang menyediakan koleksi Nike terlengkap, dari sepatu olahraga hingga gaya hidup.",
+    "address": "Jl. Olahraga No. 45, Bandung, Jawa Barat, Indonesia",
+    "contact": {
+      "phone": "+62-811-2233-4455",
+      "email": "cs@nikecorner.id",
+      "instagram": "@nikecorner.id"
+    },
+    "hours": {
+      "monday_to_saturday": "10:00 - 20:00",
+      "sunday": "10:00 - 18:00"
+    },
+    "tags": ["resmi", "Nike", "Bandung", "sepatu", "olahraga", "lifestyle"]
+  }
+]

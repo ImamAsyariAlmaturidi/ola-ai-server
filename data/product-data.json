@@ -1,0 +1,182 @@
+[
+  {
+    "product_id": "NK001",
+    "name": "Nike Air Force 1 '07",
+    "category": "Lifestyle",
+    "price": 1499000,
+    "description": "Sepatu klasik dengan siluet ikonik yang cocok untuk gaya kasual sehari-hari.",
+    "store_id": "nike-corner",
+    "colors": ["white", "black", "grey"]
+  },
+  {
+    "product_id": "NK002",
+    "name": "Nike Air Zoom Pegasus 40",
+    "category": "Running",
+    "price": 1799000,
+    "description": "Sepatu lari dengan bantalan responsif dan desain breathable untuk performa maksimal.",
+    "store_id": "nike-corner",
+    "colors": ["blue", "black", "grey"]
+  },
+  {
+    "product_id": "NK003",
+    "name": "Nike Dunk Low Retro",
+    "category": "Lifestyle",
+    "price": 1650000,
+    "description": "Sepatu low-cut dengan nuansa retro yang jadi favorit sneakerhead di seluruh dunia.",
+    "store_id": "nike-corner",
+    "colors": ["white", "red", "black"]
+  },
+  {
+    "product_id": "NK004",
+    "name": "Nike Zoom Freak 5",
+    "category": "Basketball",
+    "price": 1899000,
+    "description": "Sepatu basket signature Giannis Antetokounmpo dengan traksi optimal dan desain agresif.",
+    "store_id": "nike-corner",
+    "colors": ["green", "black", "white"]
+  },
+  {
+    "product_id": "NK005",
+    "name": "Nike Metcon 9",
+    "category": "Training",
+    "price": 1699000,
+    "description": "Sepatu training tangguh dengan stabilitas tinggi untuk latihan berat seperti angkat beban dan HIIT.",
+    "store_id": "nike-corner",
+    "colors": ["black", "grey", "orange"]
+  },
+  {
+    "product_id": "NK006",
+    "name": "Nike Air Max 270",
+    "category": "Lifestyle",
+    "price": 2099000,
+    "description": "Sepatu dengan teknologi Air Max yang ikonik dan kenyamanan maksimal untuk sehari-hari.",
+    "store_id": "nike-corner",
+    "colors": ["white", "blue", "grey"]
+  },
+  {
+    "product_id": "NK007",
+    "name": "Nike React Infinity Run Flyknit",
+    "category": "Running",
+    "price": 1999000,
+    "description": "Sepatu lari dengan teknologi React yang menawarkan kenyamanan dan dukungan ekstra untuk lari jarak jauh.",
+    "store_id": "nike-corner",
+    "colors": ["black", "grey", "green"]
+  },
+  {
+    "product_id": "NK008",
+    "name": "Nike Air VaporMax 2020 Flyknit",
+    "category": "Lifestyle",
+    "price": 2499000,
+    "description": "Sepatu dengan teknologi VaporMax yang memberikan kenyamanan maksimal dan responsif.",
+    "store_id": "nike-corner",
+    "colors": ["black", "blue", "silver"]
+  },
+  {
+    "product_id": "NK009",
+    "name": "Nike Air Max 90",
+    "category": "Lifestyle",
+    "price": 1799000,
+    "description": "Sepatu klasik yang tetap populer dengan desain retro dan kenyamanan legendaris.",
+    "store_id": "nike-corner",
+    "colors": ["white", "black", "red"]
+  },
+  {
+    "product_id": "NK010",
+    "name": "Nike Blazer Mid '77 Vintage",
+    "category": "Lifestyle",
+    "price": 1399000,
+    "description": "Sepatu mid-top dengan desain retro yang menggabungkan gaya klasik dan kenyamanan modern.",
+    "store_id": "nike-corner",
+    "colors": ["white", "grey", "black"]
+  },
+  {
+    "product_id": "NK011",
+    "name": "Nike Zoom Winflo 8",
+    "category": "Running",
+    "price": 1599000,
+    "description": "Sepatu lari dengan bantalan yang responsif dan desain yang ringan untuk pelari dengan segala level.",
+    "store_id": "nike-corner",
+    "colors": ["blue", "black", "white"]
+  },
+  {
+    "product_id": "NK012",
+    "name": "Nike Free RN 5.0",
+    "category": "Running",
+    "price": 1499000,
+    "description": "Sepatu ringan dengan fleksibilitas tinggi dan kenyamanan maksimal untuk pelari.",
+    "store_id": "nike-corner",
+    "colors": ["grey", "black", "red"]
+  },
+  {
+    "product_id": "NK013",
+    "name": "Nike Air Huarache",
+    "category": "Lifestyle",
+    "price": 1799000,
+    "description": "Sepatu dengan desain futuristik dan teknologi Huarache yang menawarkan kenyamanan sepanjang hari.",
+    "store_id": "nike-corner",
+    "colors": ["white", "black", "yellow"]
+  },
+  {
+    "product_id": "NK014",
+    "name": "Nike Air Zoom Structure 24",
+    "category": "Running",
+    "price": 1699000,
+    "description": "Sepatu lari dengan teknologi stabilitas dan bantalan untuk pelari yang membutuhkan dukungan ekstra.",
+    "store_id": "nike-corner",
+    "colors": ["grey", "blue", "black"]
+  },
+  {
+    "product_id": "NK015",
+    "name": "Nike Air Max 720",
+    "category": "Lifestyle",
+    "price": 2299000,
+    "description": "Sepatu dengan teknologi Air Max terbaru yang memberikan kenyamanan maksimal dan penampilan modern.",
+    "store_id": "nike-corner",
+    "colors": ["white", "black", "silver"]
+  },
+  {
+    "product_id": "NK016",
+    "name": "Nike Air Zoom SuperRep 2",
+    "category": "Training",
+    "price": 1799000,
+    "description": "Sepatu untuk latihan HIIT dan kelas grup dengan bantalan yang responsif dan traksi maksimal.",
+    "store_id": "nike-corner",
+    "colors": ["black", "red", "white"]
+  },
+  {
+    "product_id": "NK017",
+    "name": "Nike Air Max 1",
+    "category": "Lifestyle",
+    "price": 1699000,
+    "description": "Sepatu retro dengan desain klasik yang tetap populer sepanjang masa.",
+    "store_id": "nike-corner",
+    "colors": ["white", "black", "grey"]
+  },
+  {
+    "product_id": "NK018",
+    "name": "Nike React Element 55",
+    "category": "Lifestyle",
+    "price": 1799000,
+    "description": "Sepatu dengan desain kontemporer dan teknologi React untuk kenyamanan sepanjang hari.",
+    "store_id": "nike-corner",
+    "colors": ["black", "grey", "blue"]
+  },
+  {
+    "product_id": "NK019",
+    "name": "Nike LeBron 18",
+    "category": "Basketball",
+    "price": 2199000,
+    "description": "Sepatu basket yang dirancang khusus untuk pemain dengan permainan fisik dan cepat.",
+    "store_id": "nike-corner",
+    "colors": ["purple", "black", "white"]
+  },
+  {
+    "product_id": "NK020",
+    "name": "Nike Zoom Freak 2",
+    "category": "Basketball",
+    "price": 1999000,
+    "description": "Sepatu basket signature Giannis dengan desain modern dan traksi luar biasa untuk permainan yang agresif.",
+    "store_id": "nike-corner",
+    "colors": ["green", "black", "white"]
+  }
+]

@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import commentRouter from "./routes/instagram/comment";
 import axios from "axios";
 import qs from "qs";
+import { connectMongo } from "./db/mongodb";
 import {
   getAccessToken,
   getLongLivedAccessToken,
@@ -10,13 +11,15 @@ import {
   saveAccessTokenToRedis,
 } from "./utils/tokenManager";
 import { getCommentReply } from "./agent/handlres/instagram/commentAgent";
+import authRouter from "./routes/dashboard/authRoute";
 dotenv.config();
-
 const app = express();
 
+connectMongo();
 // Use Express built-in middleware instead of body-parser
 app.use(express.json());
 
+app.use("/auth", authRouter);
 app.get("/instagram/profile", async (req: Request, res: Response) => {
   try {
     const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;

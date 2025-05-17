@@ -16,6 +16,7 @@ dotenv.config();
 const app = express();
 
 connectMongo();
+app.use("/public", express.static("public"));
 // Use Express built-in middleware instead of body-parser
 app.use(express.json());
 

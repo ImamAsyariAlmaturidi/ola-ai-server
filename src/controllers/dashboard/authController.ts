@@ -2,7 +2,9 @@ import { Request, Response } from "express";
 import User from "../../models/User";
 import Verification from "../../models/Verification";
 import jwt from "jsonwebtoken";
-import { sendVerifyCode } from "../../utils/mailgun";
+import { sendVerifyCode } from "../../utils/sendgrid";
+import dotenv from "dotenv";
+dotenv.config();
 export default class AuthController {
   static async requestCode(req: Request, res: Response): Promise<void> {
     const { email } = req.body;
@@ -28,7 +30,8 @@ export default class AuthController {
         used: false,
       });
 
-      sendVerifyCode(email, code);
+      const result = await sendVerifyCode(email, code);
+      console.log("Email sent:", result);
       res.status(200).json({ message: "Code generated", code });
     } catch (error) {
       console.error(error);
@@ -88,6 +91,7 @@ export default class AuthController {
         }
       );
 
+      console.log("masuk sini, 2");
       res.status(200).json({
         message: "Verification success",
         user: {
@@ -98,6 +102,7 @@ export default class AuthController {
         token,
       });
     } catch (error) {
+      console.log(error);
       console.error(error);
       res.status(500).json({ message: "Internal server error" });
     }

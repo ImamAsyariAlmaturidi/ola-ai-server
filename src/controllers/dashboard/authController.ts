@@ -31,7 +31,7 @@ export default class AuthController {
       });
 
       const result = await sendVerifyCode(email, code);
-      console.log("Email sent:", result);
+      // console.log("Email sent:", result);
       res.status(200).json({ message: "Code generated", code });
     } catch (error) {
       console.error(error);
@@ -91,7 +91,7 @@ export default class AuthController {
         }
       );
 
-      console.log("masuk sini, 2");
+      // console.log("masuk sini, 2");
       res.status(200).json({
         message: "Verification success",
         user: {
@@ -102,7 +102,7 @@ export default class AuthController {
         token,
       });
     } catch (error) {
-      console.log(error);
+      // console.log(error);
       console.error(error);
       res.status(500).json({ message: "Internal server error" });
     }

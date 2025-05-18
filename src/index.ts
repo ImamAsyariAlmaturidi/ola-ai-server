@@ -3,16 +3,20 @@ import dotenv from "dotenv";
 import commentRouter from "./routes/instagram/comment";
 import axios from "axios";
 import { connectMongo } from "./db/mongodb";
+import { authenticate, AuthRequest } from "./middlewares/authMiddleware";
 import {
   getAccessToken,
   getLongLivedAccessToken,
   refreshAccessToken,
   saveAccessTokenToRedis,
 } from "./utils/tokenManager";
-import crypto from "crypto";
 
 import { getCommentReply } from "./agent/handlres/instagram/commentAgent";
 import authRouter from "./routes/dashboard/authRoute";
+import FacebookPage from "./models/FacebookPage";
+import { Types } from "mongoose";
+import User from "./models/User";
+import { decodeToken } from "./utils/jwt";
 dotenv.config();
 const app = express();
 
@@ -69,15 +73,68 @@ app.get("/instagram/profile", async (req: Request, res: Response) => {
   }
 });
 
+app.get(
+  "/facebook-pages",
+  authenticate,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const userId = req.user?._id;
+
+      const userWithPages = await User.aggregate([
+        { $match: { _id: new Types.ObjectId(userId) } },
+        {
+          $lookup: {
+            from: "facebookpages",
+            localField: "_id",
+            foreignField: "user_id",
+            as: "facebookPages",
+          },
+        },
+        {
+          $project: {
+            _id: 1,
+            email: 1,
+            facebookAccessToken: 1,
+            facebookPages: {
+              fb_user_id: 1,
+              page_id: 1,
+              page_name: 1,
+              ig_id: 1,
+              is_selected: 1,
+            },
+          },
+        },
+      ]);
+
+      if (!userWithPages.length) {
+        res.status(404).json({ message: "User not found." });
+      } else {
+        console.log(userWithPages[0]);
+        res.json(userWithPages[0]);
+      }
+    } catch (err: any) {
+      console.error("Error fetching facebook pages:", err.message);
+      res.status(500).json({ message: "Server error" });
+    }
+  }
+);
+
 app.get("/callback", async (req: Request, res: Response): Promise<void> => {
   const code = req.query.code as string;
   const clientId = (req.query.client_id as string) || process.env.APP_ID;
   const clientSecret =
     (req.query.client_secret as string) || process.env.APP_SECRET;
   const redirectUri =
-    (req.query.redirect_uri as string) || process.env.INSTAGRAM_REDIRECT_URI;
+    (req.query.redirect_uri as string) || process.env.REDIRECT_URI;
 
-  // console.log(code, clientId, clientSecret, redirectUri);
+  const state = req.query.state as string;
+  const resultDecode = decodeToken(state);
+  const userId = resultDecode?._id;
+  if (!state) {
+    res.status(400).send("Missing state parameter.");
+    return;
+  }
+
   if (!code || !clientId || !clientSecret || !redirectUri) {
     res.status(400).send("Missing required parameters.");
     return;
@@ -116,12 +173,45 @@ app.get("/callback", async (req: Request, res: Response): Promise<void> => {
         };
       })
     );
-    res.json({
-      message: "Access token retrieved successfully",
-      accessToken,
-      pages,
-      pagesWithIG,
+
+    const getUserProfileFacebook = await axios.get(
+      `https://graph.facebook.com/me?fields=id,name&access_token=${longAccessToken}`
+    );
+
+    const fbUserId = getUserProfileFacebook.data.id;
+    for (const page of pagesWithIG) {
+      const existingPage = await FacebookPage.findOne({
+        page_id: page.page_id,
+      });
+
+      if (existingPage) {
+        existingPage.page_name = page.page_name;
+        existingPage.page_token = page.page_token;
+        existingPage.ig_id = page.ig_id;
+        existingPage.updated_at = new Date();
+        existingPage.user_id = new Types.ObjectId(userId);
+        await existingPage.save();
+      } else {
+        const newPage = new FacebookPage({
+          fb_user_id: fbUserId,
+          page_id: page.page_id,
+          page_name: page.page_name,
+          page_token: page.page_token,
+          ig_id: page.ig_id,
+          user_id: new Types.ObjectId(userId),
+          is_selected: false,
+          created_at: new Date(),
+          updated_at: new Date(),
+        });
+        await newPage.save();
+      }
+    }
+
+    await User.findByIdAndUpdate(new Types.ObjectId(userId), {
+      facebookAccessToken: longAccessToken,
     });
+
+    res.redirect(`https://dashboard.olaai.space/connect-account?success=true`);
   } catch (error: any) {
     console.log(
       "Error details:",
@@ -139,14 +229,14 @@ app.get("/callback", async (req: Request, res: Response): Promise<void> => {
 //   } else {
 //     console.log("ini client id valid", process.env.INSTAGRAM_CLIENT_ID);
 //     console.log("ini client secret valid", process.env.INSTAGRAM_CLIENT_SECRET);
-//     console.log("ini redirect url valid", process.env.INSTAGRAM_REDIRECT_URI);
+//     console.log("ini redirect url valid", process.env.REDIRECT_URI);
 
 //     try {
 //       const formData = new URLSearchParams();
 //       formData.append("client_id", process.env.INSTAGRAM_CLIENT_ID!);
 //       formData.append("client_secret", process.env.INSTAGRAM_CLIENT_SECRET!);
 //       formData.append("grant_type", "authorization_code");
-//       formData.append("redirect_uri", process.env.INSTAGRAM_REDIRECT_URI!);
+//       formData.append("redirect_uri", process.env.REDIRECT_URI!);
 //       formData.append("code", code);
 
 //       const response = await axios.post(
@@ -164,7 +254,7 @@ app.get("/callback", async (req: Request, res: Response): Promise<void> => {
 //             grant_type: "ig_exchange_token",
 //             client_id: process.env.INSTAGRAM_CLIENT_ID, // Client ID dari Instagram
 //             client_secret: process.env.INSTAGRAM_CLIENT_SECRET, // Client Secret dari Instagram
-//             redirect_uri: process.env.INSTAGRAM_REDIRECT_URI, // URL redirect yang sama saat mendapatkan token
+//             redirect_uri: process.env.REDIRECT_URI, // URL redirect yang sama saat mendapatkan token
 //             access_token: shortLivedToken, // Short-lived token yang kamu dapatkan
 //           },
 //         }
@@ -240,7 +330,7 @@ app.post("/webhook", async (req: Request, res: Response): Promise<void> => {
 app.use("/comments", commentRouter);
 
 // Start the server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
 
 // Function to handle comments via agent (or controller)

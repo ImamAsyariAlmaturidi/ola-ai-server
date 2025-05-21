@@ -5,13 +5,13 @@ import { getRedisClient } from "../db/redis"; // Pastikan koneksi Redis sudah di
 export async function getLongLivedAccessToken(
   shortLivedToken: string
 ): Promise<string> {
-  const url = `https://graph.facebook.com/v12.0/oauth/access_token`;
+  const url = `https://graph.facebook.com/v22.0/oauth/access_token`;
   try {
     const response = await axios.get(url, {
       params: {
         grant_type: "fb_exchange_token",
-        client_id: process.env.APP_ID, // Ganti dengan Facebook App ID
-        client_secret: process.env.APP_SECRET, // Ganti dengan Facebook App Secret
+        client_id: process.env.APP_ID,
+        client_secret: process.env.APP_SECRET,
         fb_exchange_token: shortLivedToken,
       },
     });

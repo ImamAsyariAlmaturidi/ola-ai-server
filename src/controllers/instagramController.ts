@@ -18,7 +18,7 @@ class Controller {
         res.status(500).json({ error: "Internal Server Error" });
       }
     } catch (error) {
-      console.log(error);
+      // console.log(error);
       res.status(500).json({ error: "Internal Server Error" });
     }
   }

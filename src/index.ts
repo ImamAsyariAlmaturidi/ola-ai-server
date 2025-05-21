@@ -2,141 +2,274 @@ import express, { Request, Response } from "express";
 import dotenv from "dotenv";
 import commentRouter from "./routes/instagram/comment";
 import axios from "axios";
-import qs from "qs";
 import { connectMongo } from "./db/mongodb";
+import { authenticate, AuthRequest } from "./middlewares/authMiddleware";
 import {
   getAccessToken,
   getLongLivedAccessToken,
   refreshAccessToken,
   saveAccessTokenToRedis,
 } from "./utils/tokenManager";
+
 import { getCommentReply } from "./agent/handlres/instagram/commentAgent";
 import authRouter from "./routes/dashboard/authRoute";
+import FacebookPage from "./models/FacebookPage";
+import { Types } from "mongoose";
+import User from "./models/User";
+import { decodeToken } from "./utils/jwt";
+import cors from "cors";
+import igFetchQueue from "./queues/igFetchQueue";
+
+import "./queues/igFetchQueue";
+import "./utils/cronJobs";
 dotenv.config();
 const app = express();
 
+app.use(
+  cors({
+    origin: "*",
+  })
+);
 connectMongo();
 app.use("/public", express.static("public"));
 // Use Express built-in middleware instead of body-parser
 app.use(express.json());
 
 app.use("/auth", authRouter);
-app.get("/instagram/profile", async (req: Request, res: Response) => {
-  try {
-    const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
 
-    // STEP 1: Dapetin user_id Instagram yang terhubung ke Facebook Page
-    const userResponse = await axios.get(
-      `https://graph.instagram.com/v22.0/me?fields=media`,
-      {
-        params: {
-          access_token: accessToken,
-        },
-      }
-    );
-
-    // const pageId = userResponse.data.data[0].id;
-
-    // // STEP 2: Ambil Instagram Business Account dari Page ID
-    // const igAccountResponse = await axios.get(
-    //   `https://graph.facebook.com/v18.0/${pageId}`,
-    //   {
-    //     params: {
-    //       fields: "instagram_business_account",
-    //       access_token: accessToken,
-    //     },
-    //   }
-    // );
-
-    // const instagramId = igAccountResponse.data.instagram_business_account.id;
-
-    // // STEP 3: Ambil data Instagram profile
-    // const profileResponse = await axios.get(
-    //   `https://graph.facebook.com/v18.0/${instagramId}`,
-    //   {
-    //     params: {
-    //       fields: "username,followers_count,media_count",
-    //       access_token: accessToken,
-    //     },
-    //   }
-    // );
-
-    res.json(userResponse.data);
-  } catch (error: any) {
-    console.error("Error:", error.response?.data || error.message);
-    res.status(500).json({ error: "Failed to fetch Instagram data" });
-  }
-});
-
-app.get("/", async (req: Request, res: Response): Promise<void> => {
-  const code = req.query.code as string;
-
-  if (!code) {
-    res.status(400).send("Authorization code not found.");
-  } else {
-    console.log("ini client id valid", process.env.INSTAGRAM_CLIENT_ID);
-    console.log("ini client secret valid", process.env.INSTAGRAM_CLIENT_SECRET);
-    console.log("ini redirect url valid", process.env.INSTAGRAM_REDIRECT_URI);
-
+app.get(
+  "/facebook-pages",
+  authenticate,
+  async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      const formData = new URLSearchParams();
-      formData.append("client_id", process.env.INSTAGRAM_CLIENT_ID!);
-      formData.append("client_secret", process.env.INSTAGRAM_CLIENT_SECRET!);
-      formData.append("grant_type", "authorization_code");
-      formData.append("redirect_uri", process.env.INSTAGRAM_REDIRECT_URI!);
-      formData.append("code", code);
+      const userId = req.user?._id;
 
-      const response = await axios.post(
-        "https://api.instagram.com/oauth/access_token",
-        formData
-      );
-
-      const shortLivedToken = response.data.access_token;
-      const userId = response.data.user_id;
-
-      const result = await axios.get(
-        "https://graph.instagram.com/access_token",
+      const userWithPages = await User.aggregate([
+        { $match: { _id: new Types.ObjectId(userId) } },
         {
-          params: {
-            grant_type: "ig_exchange_token",
-            client_id: process.env.INSTAGRAM_CLIENT_ID, // Client ID dari Instagram
-            client_secret: process.env.INSTAGRAM_CLIENT_SECRET, // Client Secret dari Instagram
-            redirect_uri: process.env.INSTAGRAM_REDIRECT_URI, // URL redirect yang sama saat mendapatkan token
-            access_token: shortLivedToken, // Short-lived token yang kamu dapatkan
+          $lookup: {
+            from: "facebookpages",
+            localField: "_id",
+            foreignField: "user_id",
+            as: "facebookPages",
           },
-        }
-      );
+        },
+        {
+          $project: {
+            _id: 1,
+            email: 1,
+            facebookAccessToken: 1,
+            facebookPages: {
+              $filter: {
+                input: "$facebookPages",
+                as: "page",
+                cond: { $ne: ["$$page.ig_id", null] },
+              },
+            },
+          },
+        },
+        {
+          $project: {
+            _id: 1,
+            email: 1,
+            facebookAccessToken: 1,
+            facebookPages: {
+              $map: {
+                input: "$facebookPages",
+                as: "page",
+                in: {
+                  fb_user_id: "$$page.fb_user_id",
+                  page_id: "$$page.page_id",
+                  page_name: "$$page.page_name",
+                  ig_id: "$$page.ig_id",
+                  is_selected: "$$page.is_selected",
+                },
+              },
+            },
+          },
+        },
+      ]);
 
-      const accessToken = result.data.access_token;
-      console.log("Access Token:", accessToken);
-
-      // You can store this token in your database or session
-      res.send(`Access token: ${accessToken}<br>User ID: ${userId}`);
-    } catch (error: any) {
-      console.error(
-        "Error getting access token:",
-        error.response?.data || error.message
-      );
-      res.status(500).send("Failed to exchange code for access token.");
+      if (!userWithPages.length) {
+        res.status(404).json({ message: "User not found." });
+      } else {
+        console.log(userWithPages[0]);
+        res.json(userWithPages[0]);
+      }
+    } catch (err: any) {
+      console.error("Error fetching facebook pages:", err.message);
+      res.status(500).json({ message: "Server error" });
     }
   }
-});
-// Webhook verification endpoint
-app.get("/webhook", (req: Request, res: Response): void => {
-  const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
-  const mode = req.query["hub.mode"];
-  const token = req.query["hub.verify_token"];
-  const challenge = req.query["hub.challenge"];
+);
 
-  console.log(mode, token, challenge);
-  console.log("VERIFY_TOKEN", VERIFY_TOKEN);
-  // Verify the token from Instagram webhook request
-  if (mode === "subscribe" && token === VERIFY_TOKEN) {
-    console.log("WEBHOOK_VERIFIED");
-    res.status(200).send(challenge);
-  } else {
-    console.error("WEBHOOK_VERIFICATION_FAILED");
-    res.sendStatus(403);
+app.post(
+  "/select-facebook-page",
+  authenticate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?._id;
+      const { page_id, ig_id } = req.body;
+
+      const page = await FacebookPage.findOne({
+        page_id,
+        user_id: new Types.ObjectId(userId),
+      });
+      if (!page) {
+        res.status(404).json({ message: "Page not found." });
+        return;
+      }
+      page.is_selected = true;
+      page.ig_id = ig_id;
+      page.updated_at = new Date();
+      await page.save();
+      res.status(200).json({ message: "Page selected successfully.", page });
+    } catch (error) {
+      console.log("Error selecting Facebook pages:", error);
+    }
+  }
+);
+
+app.get("/callback", async (req: Request, res: Response): Promise<void> => {
+  const code = req.query.code as string;
+  const clientId = (req.query.client_id as string) || process.env.APP_ID;
+  const clientSecret =
+    (req.query.client_secret as string) || process.env.APP_SECRET;
+  const redirectUri =
+    (req.query.redirect_uri as string) || process.env.REDIRECT_URI;
+
+  const state = req.query.state as string;
+
+  if (!state) {
+    res.status(400).send("Missing state parameter.");
+    return;
+  }
+
+  const resultDecode = decodeToken(state);
+  const userId = resultDecode?._id;
+
+  if (!userId) {
+    res.status(400).send("Invalid state token.");
+    return;
+  }
+
+  if (!code) {
+    res.status(400).send("Missing code parameter.");
+    return;
+  }
+
+  if (!state) {
+    res.status(400).send("Missing state parameter.");
+    return;
+  }
+
+  if (!code || !clientId || !clientSecret || !redirectUri) {
+    res.status(400).send("Missing required parameters.");
+    return;
+  }
+
+  try {
+    const params = new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      redirect_uri: redirectUri,
+      code,
+    });
+
+    const tokenResponse = await axios.get(
+      `https://graph.facebook.com/v22.0/oauth/access_token?${params.toString()}`
+    );
+
+    const accessToken = tokenResponse.data.access_token;
+    const longAccessToken = await getLongLivedAccessToken(accessToken);
+    const pagesRes = await axios.get(
+      `https://graph.facebook.com/me/accounts?access_token=${longAccessToken}`
+    );
+
+    const pages = pagesRes.data.data;
+
+    const pagesWithIG = await Promise.all(
+      pages.map(async (page: any) => {
+        const pageDetails = await axios.get(
+          `https://graph.facebook.com/${page.id}?fields=name,instagram_business_account&access_token=${page.access_token}`
+        );
+        return {
+          page_id: page.id,
+          page_name: page.name,
+          ig_id: pageDetails.data.instagram_business_account?.id || null,
+          page_token: page.access_token,
+        };
+      })
+    );
+
+    const getUserProfileFacebook = await axios.get(
+      `https://graph.facebook.com/me?fields=id,name&access_token=${longAccessToken}`
+    );
+
+    const fbUserId = getUserProfileFacebook.data.id;
+    for (const page of pagesWithIG) {
+      const existingPage = await FacebookPage.findOne({
+        page_id: page.page_id,
+      });
+
+      if (existingPage) {
+        existingPage.page_name = page.page_name;
+        existingPage.page_token = page.page_token;
+        existingPage.ig_id = page.ig_id;
+        existingPage.updated_at = new Date();
+        existingPage.user_id = new Types.ObjectId(userId);
+        await existingPage.save();
+      } else {
+        const newPage = new FacebookPage({
+          fb_user_id: fbUserId,
+          page_id: page.page_id,
+          page_name: page.page_name,
+          page_token: page.page_token,
+          ig_id: page.ig_id,
+          user_id: new Types.ObjectId(userId),
+          is_selected: false,
+          created_at: new Date(),
+          updated_at: new Date(),
+        });
+        await newPage.save();
+      }
+    }
+
+    await User.findByIdAndUpdate(new Types.ObjectId(userId), {
+      facebookAccessToken: longAccessToken,
+    });
+
+    const jobs = [];
+
+    for (const page of pagesWithIG) {
+      if (page.ig_id) {
+        jobs.push(
+          igFetchQueue.add("profile", {
+            userId,
+            igProfileId: page.ig_id,
+            accessToken: page.page_token,
+            jobType: "profile",
+          }),
+          igFetchQueue.add("media", {
+            userId,
+            igProfileId: page.ig_id,
+            accessToken: page.page_token,
+            jobType: "media",
+          })
+        );
+      }
+    }
+
+    await Promise.all(jobs);
+    res.redirect(
+      `https://4cae-2a09-bac5-3a15-272d-00-3e7-87.ngrok-free.app/connect-account?success=true`
+    );
+  } catch (error: any) {
+    console.log(
+      "Error details:",
+      error.response ? error.response.data : error.message
+    );
+    res.status(500).send("Error getting access token.");
   }
 });
 

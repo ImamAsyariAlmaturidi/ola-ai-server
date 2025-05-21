@@ -18,6 +18,10 @@ import { Types } from "mongoose";
 import User from "./models/User";
 import { decodeToken } from "./utils/jwt";
 import cors from "cors";
+import igFetchQueue from "./queues/igFetchQueue";
+
+import "./queues/igFetchQueue";
+import "./utils/cronJobs";
 dotenv.config();
 const app = express();
 
@@ -135,8 +139,25 @@ app.get("/callback", async (req: Request, res: Response): Promise<void> => {
     (req.query.redirect_uri as string) || process.env.REDIRECT_URI;
 
   const state = req.query.state as string;
+
+  if (!state) {
+    res.status(400).send("Missing state parameter.");
+    return;
+  }
+
   const resultDecode = decodeToken(state);
   const userId = resultDecode?._id;
+
+  if (!userId) {
+    res.status(400).send("Invalid state token.");
+    return;
+  }
+
+  if (!code) {
+    res.status(400).send("Missing code parameter.");
+    return;
+  }
+
   if (!state) {
     res.status(400).send("Missing state parameter.");
     return;
@@ -217,6 +238,29 @@ app.get("/callback", async (req: Request, res: Response): Promise<void> => {
     await User.findByIdAndUpdate(new Types.ObjectId(userId), {
       facebookAccessToken: longAccessToken,
     });
+
+    const jobs = [];
+
+    for (const page of pagesWithIG) {
+      if (page.ig_id) {
+        jobs.push(
+          igFetchQueue.add("profile", {
+            userId,
+            igProfileId: page.ig_id,
+            accessToken: page.page_token,
+            jobType: "profile",
+          }),
+          igFetchQueue.add("media", {
+            userId,
+            igProfileId: page.ig_id,
+            accessToken: page.page_token,
+            jobType: "media",
+          })
+        );
+      }
+    }
+
+    await Promise.all(jobs);
     res.redirect(
       `https://4cae-2a09-bac5-3a15-272d-00-3e7-87.ngrok-free.app/connect-account?success=true`
     );

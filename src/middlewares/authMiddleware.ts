@@ -5,6 +5,8 @@ const JWT_SECRET = process.env.JWT_SECRET ?? "coba ini aja dl";
 
 export interface AuthRequest extends Request {
   user?: { _id: string; email: string };
+  page_id?: string;
+  ig_id?: string;
 }
 
 export const authenticate = (
@@ -27,6 +29,7 @@ export const authenticate = (
       email: string;
     };
     req.user = decoded;
+
     next();
   } catch (err) {
     res.status(401).json({ message: "Invalid or expired token" });

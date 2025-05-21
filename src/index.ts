@@ -17,61 +17,21 @@ import FacebookPage from "./models/FacebookPage";
 import { Types } from "mongoose";
 import User from "./models/User";
 import { decodeToken } from "./utils/jwt";
+import cors from "cors";
 dotenv.config();
 const app = express();
 
+app.use(
+  cors({
+    origin: "*",
+  })
+);
 connectMongo();
 app.use("/public", express.static("public"));
 // Use Express built-in middleware instead of body-parser
 app.use(express.json());
 
 app.use("/auth", authRouter);
-app.get("/instagram/profile", async (req: Request, res: Response) => {
-  try {
-    const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
-
-    // STEP 1: Dapetin user_id Instagram yang terhubung ke Facebook Page
-    const userResponse = await axios.get(
-      `https://graph.instagram.com/v22.0/me?fields=media`,
-      {
-        params: {
-          access_token: accessToken,
-        },
-      }
-    );
-
-    // const pageId = userResponse.data.data[0].id;
-
-    // // STEP 2: Ambil Instagram Business Account dari Page ID
-    // const igAccountResponse = await axios.get(
-    //   `https://graph.facebook.com/v18.0/${pageId}`,
-    //   {
-    //     params: {
-    //       fields: "instagram_business_account",
-    //       access_token: accessToken,
-    //     },
-    //   }
-    // );
-
-    // const instagramId = igAccountResponse.data.instagram_business_account.id;
-
-    // // STEP 3: Ambil data Instagram profile
-    // const profileResponse = await axios.get(
-    //   `https://graph.facebook.com/v18.0/${instagramId}`,
-    //   {
-    //     params: {
-    //       fields: "username,followers_count,media_count",
-    //       access_token: accessToken,
-    //     },
-    //   }
-    // );
-
-    res.json(userResponse.data);
-  } catch (error: any) {
-    console.error("Error:", error.response?.data || error.message);
-    res.status(500).json({ error: "Failed to fetch Instagram data" });
-  }
-});
 
 app.get(
   "/facebook-pages",
@@ -96,11 +56,31 @@ app.get(
             email: 1,
             facebookAccessToken: 1,
             facebookPages: {
-              fb_user_id: 1,
-              page_id: 1,
-              page_name: 1,
-              ig_id: 1,
-              is_selected: 1,
+              $filter: {
+                input: "$facebookPages",
+                as: "page",
+                cond: { $ne: ["$$page.ig_id", null] },
+              },
+            },
+          },
+        },
+        {
+          $project: {
+            _id: 1,
+            email: 1,
+            facebookAccessToken: 1,
+            facebookPages: {
+              $map: {
+                input: "$facebookPages",
+                as: "page",
+                in: {
+                  fb_user_id: "$$page.fb_user_id",
+                  page_id: "$$page.page_id",
+                  page_name: "$$page.page_name",
+                  ig_id: "$$page.ig_id",
+                  is_selected: "$$page.is_selected",
+                },
+              },
             },
           },
         },
@@ -115,6 +95,33 @@ app.get(
     } catch (err: any) {
       console.error("Error fetching facebook pages:", err.message);
       res.status(500).json({ message: "Server error" });
+    }
+  }
+);
+
+app.post(
+  "/select-facebook-page",
+  authenticate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?._id;
+      const { page_id, ig_id } = req.body;
+
+      const page = await FacebookPage.findOne({
+        page_id,
+        user_id: new Types.ObjectId(userId),
+      });
+      if (!page) {
+        res.status(404).json({ message: "Page not found." });
+        return;
+      }
+      page.is_selected = true;
+      page.ig_id = ig_id;
+      page.updated_at = new Date();
+      await page.save();
+      res.status(200).json({ message: "Page selected successfully.", page });
+    } catch (error) {
+      console.log("Error selecting Facebook pages:", error);
     }
   }
 );
@@ -210,86 +217,15 @@ app.get("/callback", async (req: Request, res: Response): Promise<void> => {
     await User.findByIdAndUpdate(new Types.ObjectId(userId), {
       facebookAccessToken: longAccessToken,
     });
-
-    res.redirect(`https://dashboard.olaai.space/connect-account?success=true`);
+    res.redirect(
+      `https://4cae-2a09-bac5-3a15-272d-00-3e7-87.ngrok-free.app/connect-account?success=true`
+    );
   } catch (error: any) {
     console.log(
       "Error details:",
       error.response ? error.response.data : error.message
     );
     res.status(500).send("Error getting access token.");
-  }
-});
-
-// app.get("/callback", async (req: Request, res: Response): Promise<void> => {
-//   const code = req.query.code as string;
-
-//   if (!code) {
-//     res.status(400).send("Authorization code not found.");
-//   } else {
-//     console.log("ini client id valid", process.env.INSTAGRAM_CLIENT_ID);
-//     console.log("ini client secret valid", process.env.INSTAGRAM_CLIENT_SECRET);
-//     console.log("ini redirect url valid", process.env.REDIRECT_URI);
-
-//     try {
-//       const formData = new URLSearchParams();
-//       formData.append("client_id", process.env.INSTAGRAM_CLIENT_ID!);
-//       formData.append("client_secret", process.env.INSTAGRAM_CLIENT_SECRET!);
-//       formData.append("grant_type", "authorization_code");
-//       formData.append("redirect_uri", process.env.REDIRECT_URI!);
-//       formData.append("code", code);
-
-//       const response = await axios.post(
-//         "https://api.instagram.com/oauth/access_token",
-//         formData
-//       );
-
-//       const shortLivedToken = response.data.access_token;
-//       const userId = response.data.user_id;
-
-//       const result = await axios.get(
-//         "https://graph.instagram.com/access_token",
-//         {
-//           params: {
-//             grant_type: "ig_exchange_token",
-//             client_id: process.env.INSTAGRAM_CLIENT_ID, // Client ID dari Instagram
-//             client_secret: process.env.INSTAGRAM_CLIENT_SECRET, // Client Secret dari Instagram
-//             redirect_uri: process.env.REDIRECT_URI, // URL redirect yang sama saat mendapatkan token
-//             access_token: shortLivedToken, // Short-lived token yang kamu dapatkan
-//           },
-//         }
-//       );
-
-//       const accessToken = result.data.access_token;
-//       console.log("Access Token:", accessToken);
-
-//       // You can store this token in your database or session
-//       res.send(`Access token: ${accessToken}<br>User ID: ${userId}`);
-//     } catch (error: any) {
-//       console.error(
-//         "Error getting access token:",
-//         error.response?.data || error.message
-//       );
-//       res.status(500).send("Failed to exchange code for access token.");
-//     }
-//   }
-// });
-// Webhook verification endpoint
-app.get("/webhook", (req: Request, res: Response): void => {
-  const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
-  const mode = req.query["hub.mode"];
-  const token = req.query["hub.verify_token"];
-  const challenge = req.query["hub.challenge"];
-
-  console.log(mode, token, challenge);
-  console.log("VERIFY_TOKEN", VERIFY_TOKEN);
-  // Verify the token from Instagram webhook request
-  if (mode === "subscribe" && token === VERIFY_TOKEN) {
-    console.log("WEBHOOK_VERIFIED");
-    res.status(200).send(challenge);
-  } else {
-    console.error("WEBHOOK_VERIFICATION_FAILED");
-    res.sendStatus(403);
   }
 });
 
@@ -330,7 +266,7 @@ app.post("/webhook", async (req: Request, res: Response): Promise<void> => {
 app.use("/comments", commentRouter);
 
 // Start the server
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
 
 // Function to handle comments via agent (or controller)

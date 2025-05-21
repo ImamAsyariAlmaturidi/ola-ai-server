@@ -22,6 +22,8 @@ import igFetchQueue from "./queues/igFetchQueue";
 
 import "./queues/igFetchQueue";
 import "./utils/cronJobs";
+import InstagramMedia from "./models/InstagramMedia";
+import InstagramProfile from "./models/InstagramProfile";
 dotenv.config();
 const app = express();
 
@@ -104,6 +106,37 @@ app.get(
 );
 
 app.post(
+  "/unselect-facebook-page",
+  authenticate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?._id;
+      const { page_id } = req.body;
+
+      console.log("Unselecting page_id:", page_id);
+      const page = await FacebookPage.findOne({
+        page_id,
+        user_id: new Types.ObjectId(userId),
+      });
+
+      if (!page) {
+        res.status(404).json({ message: "Page not found." });
+        return;
+      }
+
+      page.is_selected = false;
+      page.updated_at = new Date();
+      await page.save();
+
+      res.status(200).json({ message: "Page unselected successfully.", page });
+    } catch (error) {
+      console.log("Error unselecting Facebook page:", error);
+      res.status(500).json({ message: "Internal server error." });
+    }
+  }
+);
+
+app.post(
   "/select-facebook-page",
   authenticate,
   async (req: AuthRequest, res: Response) => {
@@ -129,6 +162,38 @@ app.post(
     }
   }
 );
+
+app.get(
+  "/instagram/profile-dashboard",
+  authenticate,
+  async (req: AuthRequest, res: Response) => {
+    const userId = req.user?._id;
+    const selectedFbPage = await FacebookPage.findOne({
+      user_id: userId,
+      is_selected: true,
+    });
+
+    if (!selectedFbPage || !selectedFbPage.ig_id) {
+      // Tidak ada Instagram yang aktif
+      res.json([]);
+    } else {
+      const igProfile = await InstagramProfile.find({
+        ig_id: selectedFbPage.ig_id,
+        user_id: userId,
+      });
+      res.json(igProfile);
+    }
+  }
+);
+
+app.get("/instagram/:profileId/media", authenticate, async (req, res) => {
+  const profileId = req.params.profileId;
+
+  // ambil media Instagram yang sudah tersimpan untuk profileId ini
+  const media = await InstagramMedia.find({ profile_id: profileId });
+
+  res.json(media);
+});
 
 app.get("/callback", async (req: Request, res: Response): Promise<void> => {
   const code = req.query.code as string;

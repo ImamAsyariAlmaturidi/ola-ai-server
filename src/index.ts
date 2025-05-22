@@ -327,11 +327,7 @@ app.get("/callback", async (req: Request, res: Response): Promise<void> => {
 
     await Promise.all(jobs);
     const redirectUrlToConnectAccount = process.env.REDIRECT_URI_FRONTEND;
-    res.redirect(
-      `
-      ${redirectUrlToConnectAccount}
-      `
-    );
+    res.redirect(`${redirectUrlToConnectAccount}`);
   } catch (error: any) {
     console.log(
       "Error details:",

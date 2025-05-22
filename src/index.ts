@@ -326,8 +326,11 @@ app.get("/callback", async (req: Request, res: Response): Promise<void> => {
     }
 
     await Promise.all(jobs);
+    const redirectUrlToConnectAccount = process.env.REDIRECT_URI_FRONTEND;
     res.redirect(
-      `https://4cae-2a09-bac5-3a15-272d-00-3e7-87.ngrok-free.app/connect-account?success=true`
+      `
+      ${redirectUrlToConnectAccount}
+      `
     );
   } catch (error: any) {
     console.log(

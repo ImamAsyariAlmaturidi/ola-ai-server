@@ -14,8 +14,7 @@ async function enqueueJobs(jobType: string) {
   }
 }
 
-// Cron job profile tiap 5 jam sekali
-cron.schedule("0 */5 * * *", async () => {
+cron.schedule("*/10 * * * *", async () => {
   console.log("[Cron] Enqueue profile jobs");
   await enqueueJobs("profile");
 });

@@ -12,7 +12,7 @@ export type IgFetchJobData = {
   userId: string;
   igProfileId: string;
   accessToken: string;
-  jobType: "profile" | "media" | "comment" | "dm";
+  jobType: "profile" | "media" | "comment" | "dm" | "comments";
   extra?: any;
 };
 
@@ -29,13 +29,15 @@ const worker = new Worker<IgFetchJobData>(
           await fetchMedia(userId, igProfileId, accessToken, extra);
           break;
         case "comment":
-          if (!extra?.mediaId)
-            throw new Error("mediaId required for comment job");
-          await fetchComments(userId, extra.mediaId, accessToken, userId);
+          if (!extra?.media_id)
+            throw new Error("media_id required for comment job");
+          await fetchComments(userId, extra.media_id, accessToken, userId);
           break;
         case "dm":
           await fetchDM(userId, accessToken, extra);
           break;
+        case "comments":
+          await fetchCommentsForMedia(extra.media_id, accessToken, userId);
         default:
           throw new Error("Unknown jobType: " + jobType);
       }
@@ -176,6 +178,50 @@ async function fetchComments(
   }
 
   console.log(`[igFetchQueue] Comments synced for media ID ${mediaId}`);
+}
+
+async function fetchCommentsForMedia(
+  mediaId: string,
+  accessToken: string,
+  ownerUserId: string
+) {
+  let url = `https://graph.facebook.com/v22.0/${mediaId}/comments`;
+  let total = 0;
+
+  while (url) {
+    const res = await axios.get(url, {
+      params: {
+        access_token: accessToken,
+        fields: "id,text,username,timestamp",
+        limit: 50,
+      },
+    });
+
+    const comments = res.data.data;
+    const paging = res.data.paging;
+
+    for (const comment of comments) {
+      await InstagramComment.findOneAndUpdate(
+        { comment_id: comment.id },
+        {
+          media_id: mediaId,
+          user_id: ownerUserId,
+          comment_text: comment.text,
+          username: comment.username,
+          timestamp: new Date(comment.timestamp),
+          updated_at: new Date(),
+        },
+        { upsert: true }
+      );
+    }
+
+    total += comments.length;
+    url = paging?.next || null;
+  }
+
+  console.log(
+    `[igFetchQueue] ${total} komentar disinkron untuk media ID ${mediaId}`
+  );
 }
 
 async function fetchDM(userId: string, accessToken: string, extra?: any) {

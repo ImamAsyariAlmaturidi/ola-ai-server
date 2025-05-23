@@ -351,13 +351,26 @@ app.get("/callback", async (req: Request, res: Response): Promise<void> => {
             igProfileId: page.ig_id,
             accessToken: page.page_token,
             jobType: "media",
-          }),
-          igFetchQueue.add("comment", {
-            userId,
-            igProfileId: page.ig_id,
-            accessToken: page.page_token,
-            jobType: "comment",
           })
+        );
+
+        // enqueue comments untuk semua media IG yang dimiliki user
+        const allMedia = await InstagramMedia.find({ user_id: userId });
+
+        for (const media of allMedia) {
+          jobs.push(
+            igFetchQueue.add("comment", {
+              userId,
+              igProfileId: page.ig_id,
+              accessToken: page.page_token,
+              jobType: "comment",
+              mediaId: media.media_id,
+            })
+          );
+        }
+
+        console.log(
+          `[igFetchQueue] ✅ Semua komentar dari semua media berhasil disinkronkan untuk ${page.ig_id}.`
         );
       }
     }

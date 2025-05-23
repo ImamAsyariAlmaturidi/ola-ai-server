@@ -5,7 +5,12 @@ import InstagramMedia from "../models/InstagramMedia";
 import InstagramComment from "../models/InstagramComment";
 import InstagramDm from "../models/InstagramDm";
 import connection from "../db/bullConnection";
-
+import {
+  getRandomExternalSeed,
+  getRandomExternalBgColor,
+  INTERNAL_USER_SEED,
+  INTERNAL_BG_COLOR,
+} from "../utils/dicebear"; // utils
 export const igFetchQueue = new Queue("igFetchQueue", { connection });
 
 export type IgFetchJobData = {
@@ -20,6 +25,7 @@ const worker = new Worker<IgFetchJobData>(
   "igFetchQueue",
   async (job) => {
     const { userId, igProfileId, accessToken, jobType, extra } = job.data;
+
     try {
       switch (jobType) {
         case "profile":
@@ -37,7 +43,10 @@ const worker = new Worker<IgFetchJobData>(
           await fetchDM(userId, accessToken, extra);
           break;
         case "comments":
+          if (!extra?.media_id)
+            throw new Error("media_id required for comment job");
           await fetchCommentsForMedia(extra.media_id, accessToken, userId);
+          break;
         default:
           throw new Error("Unknown jobType: " + jobType);
       }
@@ -186,7 +195,6 @@ async function fetchCommentsForMedia(
   ownerUserId: string
 ) {
   let url = `https://graph.facebook.com/v22.0/${mediaId}/comments`;
-  let total = 0;
 
   while (url) {
     const res = await axios.get(url, {
@@ -201,27 +209,97 @@ async function fetchCommentsForMedia(
     const paging = res.data.paging;
 
     for (const comment of comments) {
+      const isInternalUser = false;
+
+      const avatar_seed = isInternalUser
+        ? INTERNAL_USER_SEED
+        : getRandomExternalSeed();
+
+      const avatar_bg_color = isInternalUser
+        ? INTERNAL_BG_COLOR
+        : getRandomExternalBgColor();
+
       await InstagramComment.findOneAndUpdate(
         { comment_id: comment.id },
         {
           media_id: mediaId,
-          user_id: ownerUserId,
-          comment_text: comment.text,
+          user_id_internal: ownerUserId,
+          text: comment.text,
           username: comment.username,
           timestamp: new Date(comment.timestamp),
+          parent_comment_id: null,
+          avatar_seed,
+          avatar_bg_color,
+          updated_at: new Date(),
+        },
+        { upsert: true }
+      );
+
+      await fetchRepliesForComment(
+        comment.id,
+        accessToken,
+        ownerUserId,
+        mediaId
+      );
+    }
+
+    url = paging?.next || null;
+  }
+  console.log(`[igFetchQueue] Comments Reply synced for MEDIA`);
+}
+
+async function fetchRepliesForComment(
+  commentId: string,
+  accessToken: string,
+  ownerUserId: string,
+  mediaId: string
+) {
+  let url = `https://graph.facebook.com/v22.0/${commentId}/replies`;
+
+  while (url) {
+    const res = await axios.get(url, {
+      params: {
+        access_token: accessToken,
+        fields: "id,text,username,timestamp",
+        limit: 50,
+      },
+    });
+
+    const replies = res.data.data;
+    const paging = res.data.paging;
+
+    for (const reply of replies) {
+      const isInternalUser = false;
+
+      const avatar_seed = isInternalUser
+        ? INTERNAL_USER_SEED
+        : getRandomExternalSeed();
+
+      const avatar_bg_color = isInternalUser
+        ? INTERNAL_BG_COLOR
+        : getRandomExternalBgColor();
+
+      await InstagramComment.findOneAndUpdate(
+        { comment_id: reply.id },
+        {
+          media_id: mediaId,
+          user_id_internal: ownerUserId,
+          text: reply.text,
+          username: reply.username,
+          timestamp: new Date(reply.timestamp),
+          parent_comment_id: commentId,
+          avatar_seed,
+          avatar_bg_color,
           updated_at: new Date(),
         },
         { upsert: true }
       );
     }
 
-    total += comments.length;
     url = paging?.next || null;
   }
 
-  console.log(
-    `[igFetchQueue] ${total} komentar disinkron untuk media ID ${mediaId}`
-  );
+  console.log(`[igFetchQueue] Replies synced for comment`);
 }
 
 async function fetchDM(userId: string, accessToken: string, extra?: any) {

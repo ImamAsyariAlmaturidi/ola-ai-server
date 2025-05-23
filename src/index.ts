@@ -24,8 +24,14 @@ import "./queues/igFetchQueue";
 import "./utils/cronJobs";
 import InstagramMedia from "./models/InstagramMedia";
 import InstagramProfile from "./models/InstagramProfile";
-import InstagramPost from "./models/InstagramPost";
+
 import InstagramComment from "./models/InstagramComment";
+import {
+  InstagramComment as InstagramCommentType,
+  ReplyGroup,
+  ReplyMap,
+} from "./types/instagram";
+import { getAvatarUrl } from "./utils/dicebear";
 dotenv.config();
 const app = express();
 
@@ -97,7 +103,6 @@ app.get(
       if (!userWithPages.length) {
         res.status(404).json({ message: "User not found." });
       } else {
-        console.log(userWithPages[0]);
         res.json(userWithPages[0]);
       }
     } catch (err: any) {
@@ -115,7 +120,6 @@ app.post(
       const userId = req.user?._id;
       const { page_id } = req.body;
 
-      console.log("Unselecting page_id:", page_id);
       const page = await FacebookPage.findOne({
         page_id,
         user_id: new Types.ObjectId(userId),
@@ -132,7 +136,6 @@ app.post(
 
       res.status(200).json({ message: "Page unselected successfully.", page });
     } catch (error) {
-      console.log("Error unselecting Facebook page:", error);
       res.status(500).json({ message: "Internal server error." });
     }
   }
@@ -189,32 +192,115 @@ app.get(
 );
 
 app.get(
-  "/instagram/media",
+  "/instagram/media-comments",
   authenticate,
   async (req: AuthRequest, res: Response) => {
     const userId = req.user?._id;
-    const selectedFbPage = await FacebookPage.findOne({
-      user_id: userId,
-      is_selected: true,
-    });
-    if (!selectedFbPage || !selectedFbPage.ig_id) {
-      // Tidak ada Instagram yang aktif
-      res.json([]);
-    } else {
-      const igProfile = await InstagramPost.find({
-        ig_id: selectedFbPage.ig_id,
+    const mediaLimit = 20;
+    const commentLimit = 10;
+    const replyLimit = 10;
+
+    try {
+      // Ambil 20 media user
+      const mediaList = await InstagramMedia.find({ user_id: userId })
+        .limit(mediaLimit)
+        .lean();
+
+      const result = [];
+
+      const profile = await InstagramProfile.findOne({
         user_id: userId,
       });
 
-      const media = await InstagramMedia.find({
-        profile_id: selectedFbPage.ig_id,
-        user_id: userId,
-      });
-      const comments = await InstagramComment.find({
-        profile_id: selectedFbPage.ig_id,
-        user_id: userId,
-      });
-      res.json(igProfile);
+      for (const media of mediaList) {
+        // Ambil top-level comments (pakai virtuals, tapi generate avatar_url manual)
+        const topLevelCommentsRaw = await InstagramComment.find({
+          media_id: media.media_id,
+          parent_comment_id: null,
+        })
+          .sort({ timestamp: -1 })
+          .limit(commentLimit)
+          .lean(); // Tidak pakai virtuals agar kita bisa generate manual juga
+
+        // Tambahkan avatar_url manual dan cek apakah internal user
+        const topLevelComments = await Promise.all(
+          topLevelCommentsRaw.map(async (comment) => {
+            const isInternalUser = comment.username === profile?.username;
+            return {
+              ...comment,
+              avatar_url: await getAvatarUrl(comment.username, isInternalUser),
+              isInternalUser,
+            };
+          })
+        );
+
+        const commentIds = topLevelComments.map((c) => c.comment_id);
+
+        // Ambil replies pakai aggregate
+        const repliesRaw = (await InstagramComment.aggregate([
+          {
+            $match: {
+              parent_comment_id: { $in: commentIds },
+              media_id: media.media_id,
+            },
+          },
+          { $sort: { timestamp: 1 } },
+          {
+            $group: {
+              _id: "$parent_comment_id",
+              replies: { $push: "$$ROOT" },
+            },
+          },
+          {
+            $project: {
+              replies: { $slice: ["$replies", replyLimit] },
+            },
+          },
+        ])) as ReplyGroup[];
+
+        // Tambahkan avatar_url dan cek internal user ke setiap reply
+        const replies = await Promise.all(
+          repliesRaw.map(async (group) => ({
+            _id: group._id,
+            replies: await Promise.all(
+              group.replies.map(async (reply) => {
+                const isInternalUser = reply.username === profile?.username;
+                return {
+                  ...reply,
+                  avatar_url: await getAvatarUrl(
+                    reply.username,
+                    isInternalUser
+                  ),
+                  isInternalUser,
+                };
+              })
+            ),
+          }))
+        );
+
+        // Buat mapping dari parent_comment_id ke reply array
+        const replyMap: ReplyMap = {};
+        for (const r of replies) {
+          replyMap[r._id] = r.replies;
+        }
+
+        // Gabungkan comment dengan replies-nya
+        const structuredComments = topLevelComments.map((comment) => ({
+          ...comment,
+          replies: replyMap[comment.comment_id] || [],
+        }));
+
+        result.push({
+          ...media,
+
+          comments: structuredComments,
+        });
+      }
+
+      res.json(result);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Internal server error" });
     }
   }
 );
@@ -363,14 +449,14 @@ app.get("/callback", async (req: Request, res: Response): Promise<void> => {
               userId,
               igProfileId: page.ig_id,
               accessToken: page.page_token,
-              jobType: "comment",
-              extra: media.media_id,
+              jobType: "comments",
+              extra: { media_id: media.media_id },
             })
           );
         }
 
         console.log(
-          `[igFetchQueue] ✅ Semua komentar dari semua media berhasil disinkronkan untuk ${page.ig_id}.`
+          `[igFetchQueue] ✅ All comments success sync ${page.ig_id}.`
         );
       }
     }

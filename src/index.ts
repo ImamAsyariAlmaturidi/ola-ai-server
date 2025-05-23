@@ -358,9 +358,8 @@ app.get("/callback", async (req: Request, res: Response): Promise<void> => {
         const allMedia = await InstagramMedia.find({ user_id: userId });
 
         for (const media of allMedia) {
-          console.log(media.media_id);
           jobs.push(
-            igFetchQueue.add("comment", {
+            igFetchQueue.add("comments", {
               userId,
               igProfileId: page.ig_id,
               accessToken: page.page_token,

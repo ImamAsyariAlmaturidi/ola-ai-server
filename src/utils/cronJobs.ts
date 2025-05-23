@@ -31,11 +31,11 @@ cron.schedule("*/15 * * * *", async () => {
 // Semua schedule
 // console.log("[igFetchCron] Cron jobs are scheduled...");
 
-// // Cron job comment tiap 15 menit sekali
-// cron.schedule("* * * * *", async () => {
-//   console.log("[Cron] Enqueue comment jobs");
-//   await enqueueJobs("comment");
-// });
+// Cron job comment tiap 15 menit sekali
+cron.schedule("*/15 * * * *", async () => {
+  console.log("[Cron] Enqueue comment jobs");
+  await enqueueJobs("comment");
+});
 
 // Semua schedule
 // console.log("[igFetchCron] Cron jobs are scheduled...");

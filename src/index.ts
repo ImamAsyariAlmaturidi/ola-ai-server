@@ -24,6 +24,8 @@ import "./queues/igFetchQueue";
 import "./utils/cronJobs";
 import InstagramMedia from "./models/InstagramMedia";
 import InstagramProfile from "./models/InstagramProfile";
+import InstagramPost from "./models/InstagramPost";
+import InstagramComment from "./models/InstagramComment";
 dotenv.config();
 const app = express();
 
@@ -186,10 +188,39 @@ app.get(
   }
 );
 
+app.get(
+  "/instagram/media",
+  authenticate,
+  async (req: AuthRequest, res: Response) => {
+    const userId = req.user?._id;
+    const selectedFbPage = await FacebookPage.findOne({
+      user_id: userId,
+      is_selected: true,
+    });
+    if (!selectedFbPage || !selectedFbPage.ig_id) {
+      // Tidak ada Instagram yang aktif
+      res.json([]);
+    } else {
+      const igProfile = await InstagramPost.find({
+        ig_id: selectedFbPage.ig_id,
+        user_id: userId,
+      });
+
+      const media = await InstagramMedia.find({
+        profile_id: selectedFbPage.ig_id,
+        user_id: userId,
+      });
+      const comments = await InstagramComment.find({
+        profile_id: selectedFbPage.ig_id,
+        user_id: userId,
+      });
+      res.json(igProfile);
+    }
+  }
+);
+
 app.get("/instagram/:profileId/media", authenticate, async (req, res) => {
   const profileId = req.params.profileId;
-
-  // ambil media Instagram yang sudah tersimpan untuk profileId ini
   const media = await InstagramMedia.find({ profile_id: profileId });
 
   res.json(media);
@@ -320,6 +351,12 @@ app.get("/callback", async (req: Request, res: Response): Promise<void> => {
             igProfileId: page.ig_id,
             accessToken: page.page_token,
             jobType: "media",
+          }),
+          igFetchQueue.add("comment", {
+            userId,
+            igProfileId: page.ig_id,
+            accessToken: page.page_token,
+            jobType: "comment",
           })
         );
       }

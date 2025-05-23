@@ -194,38 +194,54 @@ app.get(
 app.get(
   "/instagram/media-comments",
   authenticate,
-  async (req: AuthRequest, res: Response) => {
+  async (req: AuthRequest, res: Response): Promise<void> => {
     const userId = req.user?._id;
+
+    // Cek halaman Facebook aktif yang terhubung ke Instagram
+    const selectedFbPage = await FacebookPage.findOne({
+      user_id: userId,
+      is_selected: true,
+    });
+
+    if (!selectedFbPage || !selectedFbPage.ig_id) {
+      res.json([]); // ❌ jangan return
+      return;
+    }
+
     const mediaLimit = 20;
     const commentLimit = 10;
     const replyLimit = 10;
 
     try {
-      // Ambil 20 media user
+      const profile = await InstagramProfile.findOne({
+        user_id: userId,
+        ig_id: selectedFbPage.ig_id,
+      });
+
+      if (!profile || !profile.username) {
+        res.status(400).json({ message: "Instagram profile not found." });
+        return;
+      }
+
+      // Ambil media Instagram user
       const mediaList = await InstagramMedia.find({ user_id: userId })
         .limit(mediaLimit)
         .lean();
 
       const result = [];
 
-      const profile = await InstagramProfile.findOne({
-        user_id: userId,
-      });
-
       for (const media of mediaList) {
-        // Ambil top-level comments (pakai virtuals, tapi generate avatar_url manual)
         const topLevelCommentsRaw = await InstagramComment.find({
           media_id: media.media_id,
           parent_comment_id: null,
         })
           .sort({ timestamp: -1 })
           .limit(commentLimit)
-          .lean(); // Tidak pakai virtuals agar kita bisa generate manual juga
+          .lean();
 
-        // Tambahkan avatar_url manual dan cek apakah internal user
         const topLevelComments = await Promise.all(
           topLevelCommentsRaw.map(async (comment) => {
-            const isInternalUser = comment.username === profile?.username;
+            const isInternalUser = comment.username === profile.username;
             return {
               ...comment,
               avatar_url: await getAvatarUrl(comment.username, isInternalUser),
@@ -236,7 +252,6 @@ app.get(
 
         const commentIds = topLevelComments.map((c) => c.comment_id);
 
-        // Ambil replies pakai aggregate
         const repliesRaw = (await InstagramComment.aggregate([
           {
             $match: {
@@ -258,13 +273,12 @@ app.get(
           },
         ])) as ReplyGroup[];
 
-        // Tambahkan avatar_url dan cek internal user ke setiap reply
         const replies = await Promise.all(
           repliesRaw.map(async (group) => ({
             _id: group._id,
             replies: await Promise.all(
               group.replies.map(async (reply) => {
-                const isInternalUser = reply.username === profile?.username;
+                const isInternalUser = reply.username === profile.username;
                 return {
                   ...reply,
                   avatar_url: await getAvatarUrl(
@@ -278,13 +292,11 @@ app.get(
           }))
         );
 
-        // Buat mapping dari parent_comment_id ke reply array
         const replyMap: ReplyMap = {};
-        for (const r of replies) {
-          replyMap[r._id] = r.replies;
+        for (const group of replies) {
+          replyMap[group._id] = group.replies;
         }
 
-        // Gabungkan comment dengan replies-nya
         const structuredComments = topLevelComments.map((comment) => ({
           ...comment,
           replies: replyMap[comment.comment_id] || [],
@@ -292,12 +304,11 @@ app.get(
 
         result.push({
           ...media,
-
           comments: structuredComments,
         });
       }
 
-      res.json(result);
+      res.json(result); // ✅ tanpa return
     } catch (err) {
       console.error(err);
       res.status(500).json({ message: "Internal server error" });

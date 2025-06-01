@@ -3,13 +3,15 @@ import dotenv from "dotenv";
 import commentRouter from "./routes/instagram/comment";
 import axios from "axios";
 import { connectMongo } from "./db/mongodb";
-import { authenticate, AuthRequest } from "./middlewares/authMiddleware";
 import {
   getAccessToken,
   getLongLivedAccessToken,
   refreshAccessToken,
   saveAccessTokenToRedis,
 } from "./utils/tokenManager";
+
+import "./queues/igFetchQueue";
+import "./utils/cronJobs";
 
 import { getCommentReply } from "./agent/handlres/instagram/commentAgent";
 import authRouter from "./routes/dashboard/authRoute";
@@ -20,18 +22,14 @@ import { decodeToken } from "./utils/jwt";
 import cors from "cors";
 import igFetchQueue from "./queues/igFetchQueue";
 
-import "./queues/igFetchQueue";
-import "./utils/cronJobs";
 import InstagramMedia from "./models/InstagramMedia";
-import InstagramProfile from "./models/InstagramProfile";
+// AI ROUTES
+import AiRouter from "./routes/ai/aiPersonaRoute";
+import aiKnowledgeBaseRoutes from "./routes/ai/aiKnowlegdeBaseRoute";
+// SOCIAL ROUTES
+import facebookRoutes from "./routes/social/facebook";
+import instagramRoutes from "./routes/social/instagram";
 
-import InstagramComment from "./models/InstagramComment";
-import {
-  InstagramComment as InstagramCommentType,
-  ReplyGroup,
-  ReplyMap,
-} from "./types/instagram";
-import { getAvatarUrl } from "./utils/dicebear";
 dotenv.config();
 const app = express();
 
@@ -46,283 +44,6 @@ app.use("/public", express.static("public"));
 app.use(express.json());
 
 app.use("/auth", authRouter);
-
-app.get(
-  "/facebook-pages",
-  authenticate,
-  async (req: AuthRequest, res: Response): Promise<void> => {
-    try {
-      const userId = req.user?._id;
-
-      const userWithPages = await User.aggregate([
-        { $match: { _id: new Types.ObjectId(userId) } },
-        {
-          $lookup: {
-            from: "facebookpages",
-            localField: "_id",
-            foreignField: "user_id",
-            as: "facebookPages",
-          },
-        },
-        {
-          $project: {
-            _id: 1,
-            email: 1,
-            facebookAccessToken: 1,
-            facebookPages: {
-              $filter: {
-                input: "$facebookPages",
-                as: "page",
-                cond: { $ne: ["$$page.ig_id", null] },
-              },
-            },
-          },
-        },
-        {
-          $project: {
-            _id: 1,
-            email: 1,
-            facebookAccessToken: 1,
-            facebookPages: {
-              $map: {
-                input: "$facebookPages",
-                as: "page",
-                in: {
-                  fb_user_id: "$$page.fb_user_id",
-                  page_id: "$$page.page_id",
-                  page_name: "$$page.page_name",
-                  ig_id: "$$page.ig_id",
-                  is_selected: "$$page.is_selected",
-                },
-              },
-            },
-          },
-        },
-      ]);
-
-      if (!userWithPages.length) {
-        res.status(404).json({ message: "User not found." });
-      } else {
-        res.json(userWithPages[0]);
-      }
-    } catch (err: any) {
-      console.error("Error fetching facebook pages:", err.message);
-      res.status(500).json({ message: "Server error" });
-    }
-  }
-);
-
-app.post(
-  "/unselect-facebook-page",
-  authenticate,
-  async (req: AuthRequest, res: Response) => {
-    try {
-      const userId = req.user?._id;
-      const { page_id } = req.body;
-
-      const page = await FacebookPage.findOne({
-        page_id,
-        user_id: new Types.ObjectId(userId),
-      });
-
-      if (!page) {
-        res.status(404).json({ message: "Page not found." });
-        return;
-      }
-
-      page.is_selected = false;
-      page.updated_at = new Date();
-      await page.save();
-
-      res.status(200).json({ message: "Page unselected successfully.", page });
-    } catch (error) {
-      res.status(500).json({ message: "Internal server error." });
-    }
-  }
-);
-
-app.post(
-  "/select-facebook-page",
-  authenticate,
-  async (req: AuthRequest, res: Response) => {
-    try {
-      const userId = req.user?._id;
-      const { page_id, ig_id } = req.body;
-
-      const page = await FacebookPage.findOne({
-        page_id,
-        user_id: new Types.ObjectId(userId),
-      });
-      if (!page) {
-        res.status(404).json({ message: "Page not found." });
-        return;
-      }
-      page.is_selected = true;
-      page.ig_id = ig_id;
-      page.updated_at = new Date();
-      await page.save();
-      res.status(200).json({ message: "Page selected successfully.", page });
-    } catch (error) {
-      console.log("Error selecting Facebook pages:", error);
-    }
-  }
-);
-
-app.get(
-  "/instagram/profile-dashboard",
-  authenticate,
-  async (req: AuthRequest, res: Response) => {
-    const userId = req.user?._id;
-    const selectedFbPage = await FacebookPage.findOne({
-      user_id: userId,
-      is_selected: true,
-    });
-
-    if (!selectedFbPage || !selectedFbPage.ig_id) {
-      // Tidak ada Instagram yang aktif
-      res.json([]);
-    } else {
-      const igProfile = await InstagramProfile.find({
-        ig_id: selectedFbPage.ig_id,
-        user_id: userId,
-      });
-      res.json(igProfile);
-    }
-  }
-);
-
-app.get(
-  "/instagram/media-comments",
-  authenticate,
-  async (req: AuthRequest, res: Response): Promise<void> => {
-    const userId = req.user?._id;
-
-    // Cek halaman Facebook aktif yang terhubung ke Instagram
-    const selectedFbPage = await FacebookPage.findOne({
-      user_id: userId,
-      is_selected: true,
-    });
-
-    if (!selectedFbPage || !selectedFbPage.ig_id) {
-      res.json([]); // ❌ jangan return
-      return;
-    }
-
-    const mediaLimit = 20;
-    const commentLimit = 10;
-    const replyLimit = 10;
-
-    try {
-      const profile = await InstagramProfile.findOne({
-        user_id: userId,
-        ig_id: selectedFbPage.ig_id,
-      });
-
-      if (!profile || !profile.username) {
-        res.status(400).json({ message: "Instagram profile not found." });
-        return;
-      }
-
-      // Ambil media Instagram user
-      const mediaList = await InstagramMedia.find({ user_id: userId })
-        .limit(mediaLimit)
-        .lean();
-
-      const result = [];
-
-      for (const media of mediaList) {
-        const topLevelCommentsRaw = await InstagramComment.find({
-          media_id: media.media_id,
-          parent_comment_id: null,
-        })
-          .sort({ timestamp: -1 })
-          .limit(commentLimit)
-          .lean();
-
-        const topLevelComments = await Promise.all(
-          topLevelCommentsRaw.map(async (comment) => {
-            const isInternalUser = comment.username === profile.username;
-            return {
-              ...comment,
-              avatar_url: await getAvatarUrl(comment.username, isInternalUser),
-              isInternalUser,
-            };
-          })
-        );
-
-        const commentIds = topLevelComments.map((c) => c.comment_id);
-
-        const repliesRaw = (await InstagramComment.aggregate([
-          {
-            $match: {
-              parent_comment_id: { $in: commentIds },
-              media_id: media.media_id,
-            },
-          },
-          { $sort: { timestamp: 1 } },
-          {
-            $group: {
-              _id: "$parent_comment_id",
-              replies: { $push: "$$ROOT" },
-            },
-          },
-          {
-            $project: {
-              replies: { $slice: ["$replies", replyLimit] },
-            },
-          },
-        ])) as ReplyGroup[];
-
-        const replies = await Promise.all(
-          repliesRaw.map(async (group) => ({
-            _id: group._id,
-            replies: await Promise.all(
-              group.replies.map(async (reply) => {
-                const isInternalUser = reply.username === profile.username;
-                return {
-                  ...reply,
-                  avatar_url: await getAvatarUrl(
-                    reply.username,
-                    isInternalUser
-                  ),
-                  isInternalUser,
-                };
-              })
-            ),
-          }))
-        );
-
-        const replyMap: ReplyMap = {};
-        for (const group of replies) {
-          replyMap[group._id] = group.replies;
-        }
-
-        const structuredComments = topLevelComments.map((comment) => ({
-          ...comment,
-          replies: replyMap[comment.comment_id] || [],
-        }));
-
-        result.push({
-          ...media,
-          comments: structuredComments,
-        });
-      }
-
-      res.json(result); // ✅ tanpa return
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  }
-);
-
-app.get("/instagram/:profileId/media", authenticate, async (req, res) => {
-  const profileId = req.params.profileId;
-  const media = await InstagramMedia.find({ profile_id: profileId });
-
-  res.json(media);
-});
-
 app.get("/callback", async (req: Request, res: Response): Promise<void> => {
   const code = req.query.code as string;
   const clientId = (req.query.client_id as string) || process.env.APP_ID;
@@ -484,6 +205,15 @@ app.get("/callback", async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+// Use comments router for handling comment-related routes
+app.use("/comments", commentRouter);
+// Use social routes for Facebook and Instagram
+app.use("/api/facebook", facebookRoutes);
+app.use("/api/instagram", instagramRoutes);
+//use AI routes for AI-related functionalities
+app.use("/api/ai/ai-persona", AiRouter);
+app.use("/api/ai/ai-knowlegde-base", aiKnowledgeBaseRoutes);
+
 // Handling POST requests for Instagram comments
 app.post("/webhook", async (req: Request, res: Response): Promise<void> => {
   const body = req.body;
@@ -516,9 +246,6 @@ app.post("/webhook", async (req: Request, res: Response): Promise<void> => {
     res.sendStatus(404);
   }
 });
-
-// Use comments router for handling comment-related routes
-app.use("/comments", commentRouter);
 
 // Start the server
 const PORT = process.env.PORT || 3000;

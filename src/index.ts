@@ -1,6 +1,6 @@
 import express, { Request, Response } from "express";
 import dotenv from "dotenv";
-import commentRouter from "./routes/instagram/comment";
+
 import axios from "axios";
 import { connectMongo } from "./db/mongodb";
 import {
@@ -29,6 +29,8 @@ import aiKnowledgeBaseRoutes from "./routes/ai/aiKnowlegdeBaseRoute";
 // SOCIAL ROUTES
 import facebookRoutes from "./routes/social/facebook";
 import instagramRoutes from "./routes/social/instagram";
+import multer from "multer";
+import path from "path";
 
 dotenv.config();
 const app = express();
@@ -39,9 +41,13 @@ app.use(
   })
 );
 connectMongo();
+const upload = multer({ dest: "uploads/" });
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
 app.use("/public", express.static("public"));
 // Use Express built-in middleware instead of body-parser
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 app.use("/auth", authRouter);
 app.get("/callback", async (req: Request, res: Response): Promise<void> => {
@@ -206,13 +212,16 @@ app.get("/callback", async (req: Request, res: Response): Promise<void> => {
 });
 
 // Use comments router for handling comment-related routes
-app.use("/comments", commentRouter);
 // Use social routes for Facebook and Instagram
 app.use("/api/facebook", facebookRoutes);
 app.use("/api/instagram", instagramRoutes);
 //use AI routes for AI-related functionalities
 app.use("/api/ai/ai-persona", AiRouter);
-app.use("/api/ai/ai-knowlegde-base", aiKnowledgeBaseRoutes);
+app.use(
+  "/api/ai/ai-knowledge-base",
+  upload.single("file"),
+  aiKnowledgeBaseRoutes
+);
 
 // Handling POST requests for Instagram comments
 app.post("/webhook", async (req: Request, res: Response): Promise<void> => {

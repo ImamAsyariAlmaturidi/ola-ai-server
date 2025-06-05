@@ -13,4 +13,12 @@ router.get(
   }
 );
 
+router.post(
+  "/comment-reply",
+  authenticate,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    await InstagramController.replyToInstagramComment(req, res);
+  }
+);
+
 export default router;

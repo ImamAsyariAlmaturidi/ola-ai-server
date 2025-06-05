@@ -32,7 +32,7 @@ export const authenticate = (
 
     next();
   } catch (err) {
-    res.status(401).json({ message: "Invalid or expired token" });
+    res.status(401).json({ meqssage: "Invalid or expired token" });
     return;
   }
 };

@@ -34,7 +34,7 @@ const AiKnowledgeBaseSchema: Schema<IAiKnowledgeBase> = new Schema({
   },
   title: { type: String, required: true },
   description: { type: String, required: true },
-  content: { type: String, required: true },
+  content: { type: String, required: true }, // Pastikan content selalu ada jika 'contentType' adalah 'text'
   fileUrl: { type: String },
   fileType: {
     type: String,
@@ -64,6 +64,20 @@ const AiKnowledgeBaseSchema: Schema<IAiKnowledgeBase> = new Schema({
 // Pre-save hook to update `updatedAt`
 AiKnowledgeBaseSchema.pre("save", function (next) {
   this.updatedAt = new Date();
+  next();
+});
+
+// Pastikan `content` diisi dengan benar jika `contentType` adalah 'text' atau ada data file jika `contentType` adalah 'file'
+AiKnowledgeBaseSchema.pre("save", function (next) {
+  if (this.contentType === "text" && !this.content) {
+    return next(new Error("Content is required when contentType is 'text'"));
+  }
+
+  // Jika contentType adalah file, pastikan fileUrl ada
+  if (this.contentType === "file" && !this.fileUrl) {
+    return next(new Error("File URL is required when contentType is 'file'"));
+  }
+
   next();
 });
 

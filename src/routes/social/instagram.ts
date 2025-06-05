@@ -21,4 +21,12 @@ router.post(
   }
 );
 
+router.get(
+  "/profile-dashboard",
+  authenticate,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    await InstagramController.getInstagramProfile(req, res);
+  }
+);
+
 export default router;

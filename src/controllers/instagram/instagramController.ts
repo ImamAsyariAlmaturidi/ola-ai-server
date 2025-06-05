@@ -108,6 +108,46 @@ export class InstagramController {
       return res.status(500).json({ message: "Internal server error" });
     }
   }
+  static async getInstagramProfile(
+    req: AuthRequest,
+    res: Response
+  ): Promise<Response> {
+    const userId = req.user?._id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    try {
+      // Ambil Facebook Page yang dipilih
+      const fbPage = await FacebookPage.findOne({
+        user_id: new Types.ObjectId(userId),
+        is_selected: true,
+      });
+
+      if (!fbPage || !fbPage.ig_id) {
+        return res.status(400).json({ message: "Instagram ID not found" });
+      }
+
+      // Ambil data Instagram Profile dari database
+      const profile = await InstagramProfile.findOne({
+        user_id: userId,
+        ig_id: fbPage.ig_id,
+      }).lean();
+
+      if (!profile) {
+        return res
+          .status(404)
+          .json({ message: "Instagram profile not found in database" });
+      }
+
+      // Tambahkan avatar URL (opsional)
+      const avatar_url = await getAvatarUrl(profile.username, true);
+
+      return res.json({ ...profile, avatar_url });
+    } catch (err) {
+      console.error("[Get IG Profile Error]", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
   static async replyToInstagramComment(
     req: AuthRequest,
     res: Response

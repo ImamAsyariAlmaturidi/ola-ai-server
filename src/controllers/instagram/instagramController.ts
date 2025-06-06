@@ -155,11 +155,15 @@ export class InstagramController {
     const userId = req.user?._id;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-    const { commentId, message } = req.body;
-    if (!commentId || !message)
-      return res
-        .status(400)
-        .json({ message: "commentId and message are required" });
+    const { commentId, mediaId, message } = req.body;
+
+    if (!message)
+      return res.status(400).json({ message: "message is required" });
+
+    if (!commentId && !mediaId)
+      return res.status(400).json({
+        message: "Either commentId or mediaId must be provided",
+      });
 
     try {
       const fbPage = await FacebookPage.findOne({
@@ -180,9 +184,12 @@ export class InstagramController {
       if (!igProfile)
         return res.status(400).json({ message: "Instagram profile not found" });
 
-      // Kirim reply ke Instagram Graph API
-      const url = `https://graph.facebook.com/v22.0/${commentId}/replies`;
-      const response = await fetch(url, {
+      // Pilih endpoint berdasarkan commentId atau mediaId
+      const endpoint = commentId
+        ? `https://graph.facebook.com/v22.0/${commentId}/replies`
+        : `https://graph.facebook.com/v22.0/${mediaId}/comments`;
+
+      const response = await fetch(endpoint, {
         method: "POST",
         body: new URLSearchParams({
           message,
@@ -193,22 +200,26 @@ export class InstagramController {
       const result = await response.json();
 
       if (!response.ok) {
-        console.error("[IG Reply Error]", result);
+        console.error("[IG Comment Error]", result);
         return res
           .status(500)
-          .json({ message: result.error?.message || "Failed to reply" });
+          .json({ message: result.error?.message || "Failed to comment" });
       }
 
-      // Opsional: simpan ke database kalau kamu track komentar lokal
-      const parentComment = await InstagramComment.findOne({
-        comment_id: commentId,
-      });
+      // Cari media_id untuk simpan ke DB
+      let mediaIdToSave = mediaId;
+      if (!mediaId && commentId) {
+        const parentComment = await InstagramComment.findOne({
+          comment_id: commentId,
+        });
+        mediaIdToSave = parentComment?.media_id || null;
+      }
 
       await InstagramComment.create({
         user_id: userId,
-        media_id: parentComment?.media_id || null,
+        media_id: mediaIdToSave,
         comment_id: result.id,
-        parent_comment_id: commentId,
+        parent_comment_id: commentId || null,
         text: message,
         username: igProfile?.username || "your_ig_username",
         timestamp: new Date(),

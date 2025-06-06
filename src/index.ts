@@ -31,6 +31,7 @@ import facebookRoutes from "./routes/social/facebook";
 import instagramRoutes from "./routes/social/instagram";
 import multer from "multer";
 import path from "path";
+import instagramWebhookRouter from "./routes/webhook/instagramWebhookRoute";
 
 dotenv.config();
 const app = express();
@@ -49,6 +50,7 @@ app.use("/public", express.static("public"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.use("/instagram", instagramWebhookRouter);
 app.use("/auth", authRouter);
 app.get("/callback", async (req: Request, res: Response): Promise<void> => {
   const code = req.query.code as string;
@@ -222,39 +224,6 @@ app.use(
   upload.single("file"),
   aiKnowledgeBaseRoutes
 );
-
-// Handling POST requests for Instagram comments
-app.post("/webhook", async (req: Request, res: Response): Promise<void> => {
-  const body = req.body;
-  console.log("==> DAPAT POST WEBHOOK");
-  console.dir(req.body, { depth: null });
-
-  // Ensure it's an Instagram object in the payload
-  if (body.object === "instagram") {
-    for (const entry of body.entry) {
-      const changes = entry.changes || [];
-      for (const change of changes) {
-        if (change.field === "comments") {
-          const commentText = change.value.text;
-          const commentId = change.value.id;
-
-          // Handle comment through agent or controller
-          try {
-            // Assuming 'handleCommentAgent' is a function that processes the comment
-            await handleCommentAgent(commentText, commentId);
-            console.log(`Handled comment: ${commentId}`);
-          } catch (error) {
-            console.error("Error handling comment:", error);
-          }
-        }
-      }
-    }
-
-    res.status(200).send("EVENT_RECEIVED");
-  } else {
-    res.sendStatus(404);
-  }
-});
 
 // Start the server
 const PORT = process.env.PORT || 3000;

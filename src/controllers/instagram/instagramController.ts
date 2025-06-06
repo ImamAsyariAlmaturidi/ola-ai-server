@@ -212,6 +212,7 @@ export class InstagramController {
         text: message,
         username: igProfile?.username || "your_ig_username",
         timestamp: new Date(),
+        user_id_internal: userId || null,
       });
 
       return res.json({ success: true, data: result });

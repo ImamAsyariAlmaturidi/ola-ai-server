@@ -6,6 +6,8 @@ import jwt from "jsonwebtoken";
 
 import axios from "axios";
 import User from "../models/User";
+import InstagramProfile from "../models/InstagramProfile";
+import InstagramComment from "../models/InstagramComment";
 dotenv.config();
 
 const AI_AGENT_WEBHOOK_COMMENT_URL = process.env.AI_AGENT_WEBHOOK_COMMENT_URL;
@@ -61,6 +63,14 @@ export class InstagramWebhookController {
                 `✅ Dapet userId: ${userId} dari mediaId: ${mediaId}`
               );
             }
+
+            const usernameComment = await InstagramComment.findOne({
+              username: username,
+              user_id: userId,
+              media_id: mediaId,
+            });
+
+            if (usernameComment) return;
 
             const findUser = await User.findOne({
               _id: userId,

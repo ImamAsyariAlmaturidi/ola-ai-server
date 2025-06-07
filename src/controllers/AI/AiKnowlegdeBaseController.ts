@@ -1,15 +1,14 @@
 import { Request, Response } from "express";
 import AiKnowledgeBase from "../../models/AI/AiKnowledgeBase";
+import { AuthRequest } from "../../middlewares/authMiddleware";
 
 export default class AiKnowledgeBaseController {
   // Menyimpan Knowledge Base Baru atau Memperbarui Yang Ada
   static async saveKnowledgeBase(
-    req: Request,
+    req: AuthRequest,
     res: Response
   ): Promise<Response> {
-    // Mendapatkan data dari body request (req.file sudah diproses oleh multer)
     const {
-      userId,
       channel,
       title,
       description,
@@ -19,23 +18,38 @@ export default class AiKnowledgeBaseController {
       contentType,
       tags = [],
     } = req.body;
+
+    const userId = req.user?._id;
     if (!userId || !channel || !title || !description || !contentType) {
       return res.status(400).json({
         error: "userId, channel, title, description, contentType are required",
       });
     }
 
-    // Menangani file jika ada
-    const uploadedFileUrl = req.file ? req.file.path : fileUrl; // Menggunakan path jika file disimpan di disk
+    const uploadedFileUrl = req.file ? req.file.path : fileUrl;
 
-    // Mengecek apakah knowledge base dengan kombinasi userId, channel, dan title sudah ada
     let knowledgeBase = await AiKnowledgeBase.findOne({
       userId,
       channel,
       title,
     });
 
-    // Jika ada, perbarui knowledge base yang ada
+    const baseData = {
+      userId,
+      channel,
+      title,
+      description,
+      content,
+      fileType,
+      contentType,
+      tags,
+    };
+
+    // Tambahkan fileUrl hanya jika ada
+    const webhookPayload = uploadedFileUrl
+      ? { ...baseData, fileUrl: uploadedFileUrl }
+      : baseData;
+
     if (knowledgeBase) {
       knowledgeBase.description = description;
       knowledgeBase.content = content;
@@ -44,31 +58,7 @@ export default class AiKnowledgeBaseController {
       knowledgeBase.contentType = contentType;
       knowledgeBase.tags = tags;
       await knowledgeBase.save();
-      try {
-        await fetch("https://olaai.app.n8n.cloud/webhook-test/set-knowlegde", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId,
-            channel,
-            title,
-            description,
-            content,
-            fileUrl: uploadedFileUrl,
-            fileType,
-            contentType,
-            tags,
-          }),
-        });
-      } catch (err) {
-        console.error("Gagal memanggil webhook N8N:", err);
-        // Lanjutkan tanpa error response, atau bisa dikembalikan jika penting
-      }
-      return res
-        .status(200)
-        .json({ message: "Knowledge Base updated", data: knowledgeBase });
     } else {
-      // Jika tidak ada, buat knowledge base baru
       knowledgeBase = new AiKnowledgeBase({
         userId,
         channel,
@@ -81,31 +71,24 @@ export default class AiKnowledgeBaseController {
         tags,
       });
       await knowledgeBase.save();
-
-      try {
-        await fetch("https://olaai.app.n8n.cloud/webhook-test/set-knowlegde", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId,
-            channel,
-            title,
-            description,
-            content,
-            fileUrl: uploadedFileUrl,
-            fileType,
-            contentType,
-            tags,
-          }),
-        });
-      } catch (err) {
-        console.error("Gagal memanggil webhook N8N:", err);
-        // Lanjutkan tanpa error response, atau bisa dikembalikan jika penting
-      }
-      return res
-        .status(201)
-        .json({ message: "Knowledge Base saved", data: knowledgeBase });
     }
+
+    try {
+      await fetch("https://olaai.app.n8n.cloud/webhook-test/set-knowlegde", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(webhookPayload),
+      });
+    } catch (err) {
+      console.error("Gagal memanggil webhook N8N:", err);
+    }
+
+    return res.status(knowledgeBase.isNew ? 201 : 200).json({
+      message: knowledgeBase.isNew
+        ? "Knowledge Base saved"
+        : "Knowledge Base updated",
+      data: knowledgeBase,
+    });
   }
 
   // Mengambil Knowledge Base berdasarkan userId, channel, dan title

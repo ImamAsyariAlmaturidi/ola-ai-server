@@ -1,11 +1,14 @@
 import { Request, Response } from "express";
 import AiPersona from "../../models/AI/AiPersona";
+import { AuthRequest } from "../../middlewares/authMiddleware";
 
 export default class AiPersonaController {
-  static async saveAiPersona(req: Request, res: Response): Promise<Response> {
+  static async saveAiPersona(
+    req: AuthRequest,
+    res: Response
+  ): Promise<Response> {
     try {
       const {
-        userId,
         channel,
         interactionType,
         style = "santai",
@@ -13,6 +16,7 @@ export default class AiPersonaController {
         promptTemplate,
       } = req.body;
 
+      const userId = req.user?._id;
       if (!userId || !channel || !interactionType || !promptTemplate) {
         return res.status(400).json({
           error:

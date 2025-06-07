@@ -1,6 +1,14 @@
 import { Request, Response } from "express";
 import dotenv from "dotenv";
+import InstagramMedia from "../models/InstagramMedia";
+import { Types } from "mongoose";
+import jwt from "jsonwebtoken";
+
+import axios from "axios";
+import User from "../models/User";
 dotenv.config();
+
+const AI_AGENT_WEBHOOK_COMMENT_URL = process.env.AI_AGENT_WEBHOOK_COMMENT_URL;
 export class InstagramWebhookController {
   static verify(req: Request, res: Response): void {
     const mode = req.query["hub.mode"];
@@ -8,7 +16,6 @@ export class InstagramWebhookController {
     const challenge = req.query["hub.challenge"];
     const VERIFY_TOKEN = process.env.VERIFY_TOKEN || "your_verify_token_here";
 
-    console.log(VERIFY_TOKEN);
     if (mode && token) {
       if (mode === "subscribe" && token === VERIFY_TOKEN) {
         console.log("WEBHOOK_VERIFIED");
@@ -29,16 +36,58 @@ export class InstagramWebhookController {
     if (body.object === "instagram") {
       for (const entry of body.entry) {
         const changes = entry.changes || [];
+        console.log(`🔔 DAPAT ${changes} CHANGES`);
         for (const change of changes) {
           if (change.field === "comments") {
-            const commentText = change.value.text;
-            const commentId = change.value.id;
+            const {
+              text: commentText,
+              id: commentId,
+              media,
+              from,
+            } = change.value;
+
+            const mediaId = media?.id;
+            const profileId = from?.id;
+            const username = from?.username;
+
+            let userId: string | Types.ObjectId | undefined;
+            const medias = await InstagramMedia.findOne({ media_id: mediaId });
+            userId = medias?.user_id;
+
+            if (!userId) {
+              console.warn(`⚠️ Gak nemu userId untuk mediaId: ${mediaId}`);
+            } else {
+              console.log(
+                `✅ Dapet userId: ${userId} dari mediaId: ${mediaId}`
+              );
+            }
+
+            const findUser = await User.findOne({
+              _id: userId,
+            });
+
+            const token = jwt.sign(
+              { _id: findUser?._id, email: findUser?.email },
+              process.env.JWT_SECRET ?? "coba ini aja dl",
+              {
+                expiresIn: "7d",
+              }
+            );
 
             try {
-              //   await handleComment(commentText, commentId);
-              console.log(`Handled comment: ${commentId}`);
+              await axios.post(`${AI_AGENT_WEBHOOK_COMMENT_URL}`, {
+                userId: userId?.toString() || "",
+                channel: "instagram",
+                interactionType: "greeting",
+                message: commentText,
+                profileId: profileId || "",
+                commentId: commentId || "",
+                mediaId: mediaId || "",
+                username: username || "",
+                token,
+              });
             } catch (error) {
-              console.error("Error handling comment:", error);
+              console.error("❌ Error sending to n8n:", error);
             }
           }
         }
@@ -47,14 +96,5 @@ export class InstagramWebhookController {
     } else {
       res.sendStatus(404);
     }
-  }
-
-  private static async handleComment(
-    commentText: string,
-    commentId: string
-  ): Promise<void> {
-    // Di sini kamu bisa panggil fungsi agent-mu
-    console.log(`Processing comment "${commentText}" with ID: ${commentId}`);
-    // await handleCommentAgent(commentText, commentId);
   }
 }

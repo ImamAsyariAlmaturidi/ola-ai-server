@@ -228,6 +228,7 @@ export class InstagramController {
 
       return res.json({ success: true, data: result });
     } catch (err) {
+      console.log(err);
       console.error("[Reply Error]", err);
       return res.status(500).json({ message: "Internal server error" });
     }

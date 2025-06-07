@@ -52,41 +52,49 @@ export class InstagramWebhookController {
             const profileId = from?.id;
             const username = from?.username;
 
-            let userId: string | Types.ObjectId | undefined;
-            const medias = await InstagramMedia.findOne({ media_id: mediaId });
-            userId = medias?.user_id;
+            const mediaData = await InstagramMedia.findOne({
+              media_id: mediaId,
+            });
+            const userId = mediaData?.user_id;
 
             if (!userId) {
               console.warn(`⚠️ Gak nemu userId untuk mediaId: ${mediaId}`);
-            } else {
-              console.log(
-                `✅ Dapet userId: ${userId} dari mediaId: ${mediaId}`
-              );
+              return;
             }
 
-            const usernameComment = await InstagramComment.findOne({
-              username: username,
+            console.log(`✅ Dapet userId: ${userId} dari mediaId: ${mediaId}`);
+
+            const isOwnAccount = await InstagramProfile.findOne({
+              username,
               user_id: userId,
-              media_id: mediaId,
             });
 
-            if (usernameComment) return;
+            if (isOwnAccount) {
+              const alreadyCommented = await InstagramComment.findOne({
+                username,
+                media_id: mediaId,
+              });
 
-            const findUser = await User.findOne({
-              _id: userId,
-            });
+              if (alreadyCommented) {
+                console.log(
+                  "⏭️ Akun sendiri udah pernah komen di media ini. Skip."
+                );
+                return;
+              }
+            }
+
+            // 🧠 Lanjut proses kalau akun orang lain, atau akun sendiri tapi belum pernah komen
+            const findUser = await User.findOne({ _id: userId });
 
             const token = jwt.sign(
               { _id: findUser?._id, email: findUser?.email },
-              process.env.JWT_SECRET ?? "coba ini aja dl",
-              {
-                expiresIn: "7d",
-              }
+              process.env.JWT_SECRET ?? "fallback",
+              { expiresIn: "7d" }
             );
 
             try {
               await axios.post(`${AI_AGENT_WEBHOOK_COMMENT_URL}`, {
-                userId: userId?.toString() || "",
+                userId: userId.toString(),
                 channel: "instagram",
                 interactionType: "greeting",
                 message: commentText,

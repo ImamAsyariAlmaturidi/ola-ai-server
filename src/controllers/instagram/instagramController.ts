@@ -9,6 +9,20 @@ import { AuthRequest } from "../../middlewares/authMiddleware";
 import { Types } from "mongoose";
 
 export class InstagramController {
+  static async authInstagram(req: AuthRequest, res: Response) {
+    const userId = req.user?._id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    try {
+      res.redirect(
+        `https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=1000301545650942&redirect_uri=https://2b5c-2a09-bac5-3a14-88c-00-da-8d.ngrok-free.app/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights`
+      );
+    } catch (err) {
+      console.log(err);
+      console.error("[Reply Error]", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
   static async getInstagramMediaComments(
     req: AuthRequest,
     res: Response

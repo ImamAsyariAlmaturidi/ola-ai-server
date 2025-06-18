@@ -30,7 +30,7 @@ export default class AuthController {
         used: false,
       });
 
-      const result = await sendVerifyCode(email, code);
+      // const result = await sendVerifyCode(email, code);
       // console.log("Email sent:", result);
       res.status(200).json({ message: "Code generated", code });
     } catch (error) {

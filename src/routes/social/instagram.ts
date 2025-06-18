@@ -6,6 +6,22 @@ import { authenticate, AuthRequest } from "../../middlewares/authMiddleware";
 const router = Router();
 
 router.get(
+  "/auth/instagram",
+  authenticate,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    await InstagramController.authInstagram(req, res);
+  }
+);
+
+router.get(
+  "/auth/instagram/callback",
+  authenticate,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    await InstagramController.authInstagram(req, res);
+  }
+);
+
+router.get(
   "/comments",
   authenticate,
   async (req: AuthRequest, res: Response): Promise<void> => {

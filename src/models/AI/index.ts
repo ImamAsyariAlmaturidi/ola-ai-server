@@ -1,6 +1,27 @@
-import AiAgent from "./AiAgent";
-import AiAbility from "./AiAbility";
-import AiIntegration from "./AiIntegration";
-import AiKnowledgeBase from "./AiKnowledgeBase";
-import AiFollowUp from "./AIFollowUp";
-export { AiAgent, AiAbility, AiIntegration, AiKnowledgeBase, AiFollowUp };
+import AiAgent from "./Agent";
+import AiIntegration from "./Integration";
+import AiKnowledgeBase from "./KnowledgeSource";
+import AiFollowUp from "./Followup";
+import AiAction from "./Action";
+import AiEmbedding from "./Embedding";
+import AiConversation from "./Conversation";
+import AiMemory from "./Memory";
+import AiPromptTemplate from "./PromptTemplate";
+import AiThirdPartyApp from "./ThirdPartyApp";
+import AiTool from "./Tool";
+import AiTrainingSession from "./TrainingSession";
+
+export {
+  AiAgent,
+  AiIntegration,
+  AiKnowledgeBase,
+  AiFollowUp,
+  AiAction,
+  AiEmbedding,
+  AiConversation,
+  AiMemory,
+  AiPromptTemplate,
+  AiThirdPartyApp,
+  AiTool,
+  AiTrainingSession,
+};

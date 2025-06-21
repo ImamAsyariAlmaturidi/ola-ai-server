@@ -27,6 +27,7 @@
     "@sendgrid/mail": "^8.1.5",
     "@types/cors": "^2.8.18",
     "axios": "^1.9.0",
+    "bcryptjs": "^3.0.2",
     "bullmq": "^5.53.0",
     "chromadb": "^2.4.3",
     "cors": "^2.8.5",

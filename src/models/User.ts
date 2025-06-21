@@ -1,18 +1,45 @@
-import { Schema, model, Document, Types } from "mongoose";
+import { Schema, model, Document } from "mongoose";
 
-interface IUser extends Document {
+export interface IUser extends Document {
   email: string;
+  password: string;
+  name?: string;
+  businessName?: string;
+  phoneNumber?: string;
   verified: boolean;
-  facebook_pages: Types.ObjectId[] | null;
-  facebookAccessToken?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-const userSchema = new Schema<IUser>({
-  email: { type: String, required: true, unique: true },
-  verified: { type: Boolean, default: false },
-  facebookAccessToken: { type: String, default: null },
+const UserSchema = new Schema<IUser>(
+  {
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    name: { type: String },
+    businessName: { type: String },
+    phoneNumber: { type: String },
+    verified: { type: Boolean, default: false },
+  },
+  { timestamps: true }
+);
+
+// Optional: hash password sebelum save
+UserSchema.pre("save", async function (next) {
+  if (this.isModified("password")) {
+    const bcrypt = await import("bcryptjs");
+    this.password = await bcrypt.hash(this.password, 10);
+  }
+  next();
 });
 
-const User = model<IUser>("User", userSchema);
+// Optional: hilangkan password di response JSON
+UserSchema.set("toJSON", {
+  transform: (_doc, ret) => {
+    delete ret.password;
+    return ret;
+  },
+});
+
+const User = model<IUser>("User", UserSchema);
 
 export default User;

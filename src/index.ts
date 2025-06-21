@@ -14,7 +14,7 @@ import "./queues/igFetchQueue";
 import "./utils/cronJobs";
 
 import { getCommentReply } from "./agent/handlres/instagram/commentAgent";
-import authRouter from "./routes/dashboard/authRoute";
+
 import FacebookPage from "./models/FacebookPage";
 import { Types } from "mongoose";
 import User from "./models/User";
@@ -23,12 +23,22 @@ import cors from "cors";
 import igFetchQueue from "./queues/igFetchQueue";
 
 import InstagramMedia from "./models/InstagramMedia";
-// AI ROUTES
-import AiRouter from "./routes/ai/aiPersonaRoute";
-import aiKnowledgeBaseRoutes from "./routes/ai/aiKnowlegdeBaseRoute";
-// SOCIAL ROUTES
-import facebookRoutes from "./routes/social/facebook";
-import instagramRoutes from "./routes/social/instagram";
+import AuthRoutes from "./routes/authRoute";
+import ProductRoutes from "./routes/productRoute";
+import FacebookRoutes from "./routes/social/facebook";
+import InstagramRoutes from "./routes/social/instagram";
+import KnowledgeSourceRoutes from "./routes/ai/knowledgeSourceRoute";
+import ActionRoutes from "./routes/ai/actionRoute";
+import AgentRoutes from "./routes/ai/agentRoute";
+import AgentRoleRoutes from "./routes/ai/agentRoleRoute";
+import ConversationRoutes from "./routes/ai/conversationRoute";
+import EmbeddingRoutes from "./routes/ai/embeddingRoute";
+import FollowupRoutes from "./routes/ai/followupRoute";
+import IntegrationRoutes from "./routes/ai/integrationRoute";
+import MemoryRoutes from "./routes/ai/memoryRoute";
+import AIToolRoutes from "./routes/ai/toolRoute";
+import PromptTemplateRoutes from "./routes/ai/promptTemplateRoute";
+import TrainingSessionRoutes from "./routes/ai/trainingSessionRoute";
 import multer from "multer";
 import path from "path";
 import instagramWebhookRouter from "./routes/webhook/instagramWebhookRoute";
@@ -50,8 +60,20 @@ app.use("/public", express.static("public"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.use("/products", ProductRoutes);
+app.use("/knowledge-sources", KnowledgeSourceRoutes);
+app.use("/actions", ActionRoutes);
+app.use("/agents", AgentRoutes);
+app.use("/agent-roles", AgentRoleRoutes);
+app.use("/conversations", ConversationRoutes);
+app.use("/embeddings", EmbeddingRoutes);
+app.use("/followups", FollowupRoutes);
+app.use("/integrations", IntegrationRoutes);
+app.use("/memories", MemoryRoutes);
+app.use("/tools", AIToolRoutes);
+app.use("/prompt-templates", PromptTemplateRoutes);
 app.use("/instagram", instagramWebhookRouter);
-app.use("/auth", authRouter);
+app.use("/auth", AuthRoutes);
 app.get("/callback", async (req: Request, res: Response): Promise<void> => {
   const code = req.query.code as string;
   const clientId = (req.query.client_id as string) || process.env.APP_ID;
@@ -215,15 +237,9 @@ app.get("/callback", async (req: Request, res: Response): Promise<void> => {
 
 // Use comments router for handling comment-related routes
 // Use social routes for Facebook and Instagram
-app.use("/api/facebook", facebookRoutes);
-app.use("/api/instagram", instagramRoutes);
+app.use("/api/facebook", FacebookRoutes);
+app.use("/api/instagram", InstagramRoutes);
 //use AI routes for AI-related functionalities
-app.use("/api/ai/ai-persona", AiRouter);
-app.use(
-  "/api/ai/ai-knowledge-base",
-  upload.single("file"),
-  aiKnowledgeBaseRoutes
-);
 
 // Start the server
 const PORT = process.env.PORT || 3000;

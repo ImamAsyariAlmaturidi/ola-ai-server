@@ -4,7 +4,8 @@ import FormData from "form-data";
 import jwt from "jsonwebtoken";
 import ConnectedPlatform from "../models/ConnectedPlatform";
 import { AuthRequest } from "../middlewares/authMiddleware";
-
+import dotenv from "dotenv";
+dotenv.config();
 export default class ConnectedPlatformController {
   // ✅ Connect Instagram
   static async connectInstagram(
@@ -176,7 +177,7 @@ export default class ConnectedPlatformController {
         return;
       }
 
-      // Verifikasi JWT dari state untuk autentikasi user
+      // ✅ Decode user dari state token
       let user: any;
       try {
         user = jwt.verify(state, process.env.JWT_SECRET!);
@@ -186,12 +187,13 @@ export default class ConnectedPlatformController {
       }
 
       const client_id = process.env.INSTAGRAM_CLIENT_ID!;
-
       const client_secret = process.env.INSTAGRAM_CLIENT_SECRET!;
       const redirect_uri = process.env.INSTAGRAM_REDIRECT_URI!;
-      console.log("✅ req.query redirect_uri:", req.query.redirect_uri);
-      console.log("✅ ENV redirect_uri:", redirect_uri);
 
+      console.log("🔁 Callback received with code:", code);
+      console.log("🔐 Using redirect_uri:", redirect_uri);
+
+      // ✅ Tukar authorization code jadi short-lived token
       const form = new FormData();
       form.append("client_id", client_id);
       form.append("client_secret", client_secret);
@@ -199,20 +201,15 @@ export default class ConnectedPlatformController {
       form.append("redirect_uri", redirect_uri);
       form.append("code", code);
 
-      // Tukar authorization code jadi short-lived token
       const tokenRes = await axios.post(
         "https://api.instagram.com/oauth/access_token",
         form,
-        {
-          headers: {
-            ...form.getHeaders(),
-          },
-        }
+        { headers: form.getHeaders() }
       );
 
       const shortToken = tokenRes.data.access_token;
 
-      // Tukar short-lived token jadi long-lived token
+      // ✅ Tukar short-lived token jadi long-lived token
       const longRes = await axios.get(
         "https://graph.instagram.com/access_token",
         {
@@ -220,7 +217,6 @@ export default class ConnectedPlatformController {
             client_id,
             client_secret,
             grant_type: "ig_exchange_token",
-
             access_token: shortToken,
           },
         }
@@ -229,39 +225,35 @@ export default class ConnectedPlatformController {
       const longToken = longRes.data.access_token;
       const expiresIn = longRes.data.expires_in;
 
-      //   // Ambil data akun Instagram pengguna
-      //   const profileRes = await axios.get("https://graph.instagram.com/me", {
-      //     params: {
-      //       fields: "id,username",
-      //       access_token: longToken,
-      //     },
-      //   });
+      // (Opsional) Ambil username dari IG Graph API jika mau
+      // const profileRes = await axios.get("https://graph.instagram.com/me", {
+      //   params: { fields: "id,username", access_token: longToken },
+      // });
+      // const { id, username } = profileRes.data;
 
-      //   const { id, username } = profileRes.data;
-
-      // Inject user dan body ke req agar bisa reuse connectGeneric
       (req as AuthRequest).user = { _id: user.id };
       (req as AuthRequest).body = {
         accountId: 1,
-        username: "testuser", // Ganti dengan username dari profileRes.data
+        username: "testuser", // ganti jika ambil dari profileRes
         name: "username",
-        profilePictureUrl: null, // IG Basic API gak kasih foto profil
+        profilePictureUrl: null,
         accessToken: longToken,
         accessTokenExpiresAt: new Date(Date.now() + expiresIn * 1000),
       };
 
-      // Panggil method generic connect
       await ConnectedPlatformController.connectGeneric(
         "instagram",
         req as AuthRequest,
         res
       );
     } catch (error: any) {
-      console.log(error);
-      console.error(
-        "Instagram OAuth Callback Error:",
-        error?.response?.data || error.message || error
-      );
+      console.error("❌ Instagram OAuth Callback Error:", {
+        message: error?.response?.data || error.message || error,
+        params: {
+          code: req.query.code,
+          redirect_uri: process.env.INSTAGRAM_REDIRECT_URI,
+        },
+      });
       res.status(500).json({ error: "Failed to connect Instagram" });
     }
   }

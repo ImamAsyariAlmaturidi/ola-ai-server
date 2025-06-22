@@ -36,10 +36,10 @@ export class InstagramController {
       const url =
         `https://www.instagram.com/oauth/authorize?` +
         `client_id=${INSTAGRAM_CLIENT_ID}` +
-        `&redirect_uri=${encodeURIComponent(INSTAGRAM_REDIRECT_URI)}` +
-        `&scope=${encodeURIComponent(scope)}` +
+        `&redirect_uri=${INSTAGRAM_REDIRECT_URI}` +
+        `&scope=${scope}` +
         `&response_type=code` +
-        `&state=${encodeURIComponent(state)}` +
+        `&state=${state}` +
         `&enable_fb_login=0&force_authentication=1`;
 
       return res.redirect(url);

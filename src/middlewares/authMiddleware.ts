@@ -4,9 +4,7 @@ import jwt from "jsonwebtoken";
 const JWT_SECRET = process.env.JWT_SECRET ?? "coba ini aja dl";
 
 export interface AuthRequest extends Request {
-  user?: { _id: string; email: string };
-  page_id?: string;
-  ig_id?: string;
+  user?: { _id: string; email?: string };
 }
 
 export const authenticate = (
@@ -32,7 +30,7 @@ export const authenticate = (
 
     next();
   } catch (err) {
-    res.status(401).json({ meqssage: "Invalid or expired token" });
+    res.status(401).json({ message: "Invalid or expired token" });
     return;
   }
 };

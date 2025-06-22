@@ -240,8 +240,11 @@ app.get("/callback", async (req: Request, res: Response): Promise<void> => {
 
 // Use comments router for handling comment-related routes
 // Use social routes for Facebook and Instagram
+// di app.ts atau server.ts
+app.set("trust proxy", 1);
 app.use("/api/facebook", FacebookRoutes);
 app.use("/api/instagram", InstagramRoutes);
+
 //use AI routes for AI-related functionalities
 
 // Start the server

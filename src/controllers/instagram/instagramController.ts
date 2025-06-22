@@ -7,18 +7,39 @@ import FacebookPage from "../../models/FacebookPage";
 import { getAvatarUrl } from "../../utils/dicebear";
 import { AuthRequest } from "../../middlewares/authMiddleware";
 import { Types } from "mongoose";
+import jwt from "jsonwebtoken";
+const INSTAGRAM_CLIENT_ID = process.env.INSTAGRAM_CLIENT_ID!;
+const INSTAGRAM_REDIRECT_URI = process.env.INSTAGRAM_REDIRECT_URI!;
+const JWT_SECRET = process.env.JWT_SECRET!;
 
 export class InstagramController {
   static async authInstagram(req: AuthRequest, res: Response) {
-    const userId = req.user?._id;
-    if (!userId) return res.status(401).json({ message: "Unauthorized" });
     try {
-      res.redirect(
-        `https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=1000301545650942&redirect_uri=https://2b5c-2a09-bac5-3a14-88c-00-da-8d.ngrok-free.app/callback&response_type=code&scope=instagram_business_basic%2Cinstagram_business_manage_messages%2Cinstagram_business_manage_comments%2Cinstagram_business_content_publish%2Cinstagram_business_manage_insights`
-      );
+      const userId = req.user?._id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+      const state = jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: "15m" });
+
+      const scope = [
+        "instagram_business_basic",
+        "instagram_business_manage_messages",
+        "instagram_business_manage_comments",
+        "instagram_business_content_publish",
+        "instagram_business_manage_insights",
+      ].join(",");
+
+      const url =
+        `https://www.instagram.com/oauth/authorize?` +
+        `client_id=${INSTAGRAM_CLIENT_ID}` +
+        `&redirect_uri=${encodeURIComponent(INSTAGRAM_REDIRECT_URI)}` +
+        `&scope=${encodeURIComponent(scope)}` +
+        `&response_type=code` +
+        `&state=${encodeURIComponent(state)}` +
+        `&enable_fb_login=0&force_authentication=1`;
+
+      return res.redirect(url);
     } catch (err) {
-      console.log(err);
-      console.error("[Reply Error]", err);
+      console.error("[Instagram OAuth Error]", err);
       return res.status(500).json({ message: "Internal server error" });
     }
   }

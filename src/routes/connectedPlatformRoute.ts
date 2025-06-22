@@ -11,6 +11,11 @@ router.get(
   ConnectedPlatformController.getConnectedPlatforms
 );
 
+router.get(
+  "/instagram/callback",
+  ConnectedPlatformController.handleInstagramCallback
+);
+
 // Instagram
 router.post(
   "/instagram",

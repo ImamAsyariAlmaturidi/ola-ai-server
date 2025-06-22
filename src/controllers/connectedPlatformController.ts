@@ -186,75 +186,23 @@ export default class ConnectedPlatformController {
         return;
       }
 
-      const client_id = process.env.INSTAGRAM_CLIENT_ID!;
-      const client_secret = process.env.INSTAGRAM_CLIENT_SECRET!;
-      const redirect_uri = process.env.INSTAGRAM_REDIRECT_URI!;
+      // ✅ Logging debug
+      console.log("🔁 OAuth callback received");
+      console.log("📦 Code:", code);
+      console.log("👤 User from state:", user);
 
-      console.log("🔁 Callback received with code:", code);
-      console.log("🔐 Using redirect_uri:", redirect_uri);
-
-      // ✅ Tukar authorization code jadi short-lived token
-      const form = new FormData();
-      form.append("client_id", client_id);
-      form.append("client_secret", client_secret);
-      form.append("grant_type", "authorization_code");
-      form.append("redirect_uri", redirect_uri.trim());
-      form.append("code", req.query.code as string);
-
-      const tokenRes = await axios.post(
-        "https://api.instagram.com/oauth/access_token",
-        form,
-        { headers: form.getHeaders() }
-      );
-
-      const shortToken = tokenRes.data.access_token;
-
-      // ✅ Tukar short-lived token jadi long-lived token
-      const longRes = await axios.get(
-        "https://graph.instagram.com/access_token",
-        {
-          params: {
-            client_id,
-            client_secret,
-            grant_type: "ig_exchange_token",
-            access_token: shortToken,
-          },
-        }
-      );
-
-      const longToken = longRes.data.access_token;
-      const expiresIn = longRes.data.expires_in;
-
-      // (Opsional) Ambil username dari IG Graph API jika mau
-      // const profileRes = await axios.get("https://graph.instagram.com/me", {
-      //   params: { fields: "id,username", access_token: longToken },
-      // });
-      // const { id, username } = profileRes.data;
-
-      (req as AuthRequest).user = { _id: user.id };
-      (req as AuthRequest).body = {
-        accountId: 1,
-        username: "testuser", // ganti jika ambil dari profileRes
-        name: "username",
-        profilePictureUrl: null,
-        accessToken: longToken,
-        accessTokenExpiresAt: new Date(Date.now() + expiresIn * 1000),
-      };
-
-      await ConnectedPlatformController.connectGeneric(
-        "instagram",
-        req as AuthRequest,
-        res
-      );
+      // ✅ Kirim response ke frontend (atau simpan dulu)
+      // Jangan tukar jadi token di sini dulu
+      res.status(200).json({
+        message: "Instagram code received",
+        code,
+        userId: user.id,
+      });
     } catch (error: any) {
       console.error("❌ Instagram OAuth Callback Error:", {
         message: error?.response?.data || error.message || error,
-        params: {
-          code: req.query.code,
-          redirect_uri: process.env.INSTAGRAM_REDIRECT_URI,
-        },
       });
-      res.status(500).json({ error: "Failed to connect Instagram" });
+      res.status(500).json({ error: "Failed to handle Instagram callback" });
     }
   }
 }

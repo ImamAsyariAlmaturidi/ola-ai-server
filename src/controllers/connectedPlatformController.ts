@@ -198,7 +198,7 @@ export default class ConnectedPlatformController {
       form.append("client_id", client_id);
       form.append("client_secret", client_secret);
       form.append("grant_type", "authorization_code");
-      form.append("redirect_uri", redirect_uri);
+      form.append("redirect_uri", decodeURIComponent(redirect_uri.trim()));
       form.append("code", code);
 
       const tokenRes = await axios.post(

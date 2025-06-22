@@ -198,8 +198,8 @@ export default class ConnectedPlatformController {
       form.append("client_id", client_id);
       form.append("client_secret", client_secret);
       form.append("grant_type", "authorization_code");
-      form.append("redirect_uri", decodeURIComponent(redirect_uri.trim()));
-      form.append("code", code);
+      form.append("redirect_uri", redirect_uri.trim());
+      form.append("code", req.query.code as string);
 
       const tokenRes = await axios.post(
         "https://api.instagram.com/oauth/access_token",

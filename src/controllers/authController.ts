@@ -22,9 +22,13 @@ export class AuthController {
         phoneNumber,
       });
 
-      const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET!, {
-        expiresIn: "7d",
-      });
+      const token = jwt.sign(
+        { id: user._id, email: user.email },
+        process.env.JWT_SECRET!,
+        {
+          expiresIn: "1d",
+        }
+      );
 
       res.status(201).json({ token, user });
     } catch (error) {
@@ -48,9 +52,13 @@ export class AuthController {
         return;
       }
 
-      const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET!, {
-        expiresIn: "7d",
-      });
+      const token = jwt.sign(
+        { id: user._id, email: user.email },
+        process.env.JWT_SECRET!,
+        {
+          expiresIn: "1d",
+        }
+      );
 
       res.status(200).json({ token, user });
     } catch (error) {

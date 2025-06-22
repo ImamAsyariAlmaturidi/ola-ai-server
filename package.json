@@ -3,8 +3,8 @@
   "module": "index.ts",
   "type": "commonjs",
   "scripts": {
-    "dev": "nodemon src/index.ts",
-    "build": "tsc",
+    "build": "tsup src --out-dir dist --format cjs --dts",
+    "dev": "tsup src --watch --out-dir dist --format cjs",
     "start": "node dist/index.js"
   },
   "devDependencies": {
@@ -14,7 +14,8 @@
     "@types/mongoose": "^5.11.96",
     "@types/multer": "^1.4.12",
     "@types/node": "^22.15.17",
-    "nodemon": "^3.1.10"
+    "nodemon": "^3.1.10",
+    "tsup": "^8.5.0"
   },
   "peerDependencies": {
     "typescript": "^5.8.3"

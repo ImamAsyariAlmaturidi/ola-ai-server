@@ -26,17 +26,19 @@ export class InstagramController {
         "instagram_business_manage_comments",
         "instagram_business_content_publish",
         "instagram_business_manage_insights",
-      ].join(",");
+      ].join("-"); // pakai "-" kalau kamu pakai `params_json`
 
-      const url =
-        `https://www.instagram.com/oauth/authorize?` +
-        `client_id=${INSTAGRAM_CLIENT_ID}` +
-        `&redirect_uri=${encodeURIComponent(INSTAGRAM_REDIRECT_URI)}` +
-        `&scope=${encodeURIComponent(scope)}` +
-        `&response_type=code` +
-        `&state=${encodeURIComponent(state)}` +
-        `&enable_fb_login=0&force_authentication=1`;
+      const params = {
+        client_id: INSTAGRAM_CLIENT_ID,
+        redirect_uri: INSTAGRAM_REDIRECT_URI, // sudah bersih, jangan di-escape
+        response_type: "code",
+        state,
+        scope,
+      };
 
+      const url = `https://www.instagram.com/consent/?flow=ig_biz_login_oauth&params_json=${encodeURIComponent(
+        JSON.stringify(params)
+      )}`;
       return res.redirect(url);
     } catch (err) {
       console.error("[Instagram OAuth Error]", err);

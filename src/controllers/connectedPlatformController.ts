@@ -172,31 +172,26 @@ export default class ConnectedPlatformController {
     try {
       const { code, state } = req.query;
 
-      if (typeof code !== "string" || typeof state !== "string") {
-        res.status(400).json({ error: "Missing or invalid code or state" });
-        return;
-      }
+      // if (typeof code !== "string" || typeof state !== "string") {
+      //   res.status(400).json({ error: "Missing or invalid code or state" });
+      //   return;
+      // }
 
       // ✅ Decode user dari state token
-      let user: any;
-      try {
-        user = jwt.verify(state, process.env.JWT_SECRET!);
-      } catch {
-        res.status(401).json({ error: "Invalid or expired state token" });
-        return;
-      }
-
-      // ✅ Logging debug
-      console.log("🔁 OAuth callback received");
-      console.log("📦 Code:", code);
-      console.log("👤 User from state:", user);
+      // let user: any;
+      // try {
+      //   user = jwt.verify(state, process.env.JWT_SECRET!);
+      // } catch {
+      //   res.status(401).json({ error: "Invalid or expired state token" });
+      //   return;
+      // }
 
       // ✅ Kirim response ke frontend (atau simpan dulu)
       // Jangan tukar jadi token di sini dulu
       res.status(200).json({
         message: "Instagram code received",
         code,
-        userId: user.id,
+        // userId: user.id,
       });
     } catch (error: any) {
       console.error("❌ Instagram OAuth Callback Error:", {

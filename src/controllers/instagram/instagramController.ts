@@ -24,25 +24,21 @@ export class InstagramController {
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
       const state = jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: "15m" });
+      const client_id = "1000301545650942";
+      const redirect_uri =
+        "https://api.olaai.id/connected-platforms/instagram/callback/";
+      const scope =
+        "instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish,instagram_business_manage_insights";
+      const response_type = "code";
+      const force_reauth = true;
+      // Construct the authorization URL
+      const authUrl = `https://www.instagram.com/oauth/authorize?force_reauth=${force_reauth}&client_id=${client_id}&redirect_uri=${encodeURIComponent(
+        redirect_uri
+      )}&response_type=${response_type}&scope=${encodeURIComponent(
+        scope
+      )}&state=${encodeURIComponent(state)}`;
 
-      const scope = [
-        "instagram_business_basic",
-        "instagram_business_manage_messages",
-        "instagram_business_manage_comments",
-        "instagram_business_content_publish",
-        "instagram_business_manage_insights",
-      ].join(",");
-
-      const url =
-        `https://www.instagram.com/oauth/authorize?` +
-        `client_id=${INSTAGRAM_CLIENT_ID}` +
-        `&redirect_uri=${INSTAGRAM_REDIRECT_URI}` +
-        `&scope=${scope}` +
-        `&response_type=code` +
-        `&state=${state}` +
-        `&enable_fb_login=0&force_authentication=1`;
-
-      return res.redirect(url);
+      return res.redirect(authUrl);
     } catch (err) {
       console.error("[Instagram OAuth Error]", err);
       return res.status(500).json({ message: "Internal server error" });

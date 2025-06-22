@@ -26,7 +26,7 @@ export class InstagramController {
       const state = jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: "15m" });
       const client_id = "1000301545650942";
       const redirect_uri =
-        "https://api.olaai.id/connected-platforms/instagram/callback/";
+        "https://api.olaai.id/connected-platforms/instagram/callback";
       const scope =
         "instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish,instagram_business_manage_insights";
       const response_type = "code";

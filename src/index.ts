@@ -39,6 +39,7 @@ import MemoryRoutes from "./routes/ai/memoryRoute";
 import AIToolRoutes from "./routes/ai/toolRoute";
 import PromptTemplateRoutes from "./routes/ai/promptTemplateRoute";
 import TrainingSessionRoutes from "./routes/ai/trainingSessionRoute";
+import ConnectedPlatformRoutes from "./routes/connectedPlatformRoute";
 import multer from "multer";
 import path from "path";
 import instagramWebhookRouter from "./routes/webhook/instagramWebhookRoute";
@@ -74,6 +75,8 @@ app.use("/tools", AIToolRoutes);
 app.use("/prompt-templates", PromptTemplateRoutes);
 app.use("/instagram", instagramWebhookRouter);
 app.use("/auth", AuthRoutes);
+app.use("/training-sessions", TrainingSessionRoutes);
+app.use("/connected-platforms", ConnectedPlatformRoutes);
 app.get("/callback", async (req: Request, res: Response): Promise<void> => {
   const code = req.query.code as string;
   const clientId = (req.query.client_id as string) || process.env.APP_ID;

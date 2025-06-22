@@ -21,24 +21,22 @@ export class InstagramController {
       const state = jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: "15m" });
 
       const scope = [
-        "instagram_business_basic",
-        "instagram_business_manage_messages",
-        "instagram_business_manage_comments",
-        "instagram_business_content_publish",
-        "instagram_business_manage_insights",
-      ].join("-"); // pakai "-" kalau kamu pakai `params_json`
+        "instagram_basic",
+        "pages_show_list",
+        "instagram_manage_messages",
+        "instagram_manage_comments",
+        "instagram_content_publish",
+        "instagram_manage_insights",
+      ].join(",");
 
-      const params = {
-        client_id: INSTAGRAM_CLIENT_ID,
-        redirect_uri: INSTAGRAM_REDIRECT_URI, // sudah bersih, jangan di-escape
-        response_type: "code",
-        state,
-        scope,
-      };
+      const url =
+        `https://www.instagram.com/oauth/authorize` +
+        `?client_id=${INSTAGRAM_CLIENT_ID}` +
+        `&redirect_uri=${encodeURIComponent(INSTAGRAM_REDIRECT_URI)}` +
+        `&scope=${encodeURIComponent(scope)}` +
+        `&response_type=code` +
+        `&state=${encodeURIComponent(state)}`;
 
-      const url = `https://www.instagram.com/consent/?flow=ig_biz_login_oauth&params_json=${encodeURIComponent(
-        JSON.stringify(params)
-      )}`;
       return res.redirect(url);
     } catch (err) {
       console.error("[Instagram OAuth Error]", err);

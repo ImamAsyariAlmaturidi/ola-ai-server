@@ -15,27 +15,32 @@ const JWT_SECRET = process.env.JWT_SECRET!;
 export class InstagramController {
   static async authInstagram(req: AuthRequest, res: Response) {
     try {
+      if (!INSTAGRAM_CLIENT_ID || !INSTAGRAM_REDIRECT_URI || !JWT_SECRET) {
+        throw new Error(
+          "Missing Instagram OAuth config in environment variables"
+        );
+      }
       const userId = req.user?._id;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
       const state = jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: "15m" });
 
       const scope = [
-        "instagram_basic",
-        "pages_show_list",
-        "instagram_manage_messages",
-        "instagram_manage_comments",
-        "instagram_content_publish",
-        "instagram_manage_insights",
+        "instagram_business_basic",
+        "instagram_business_manage_messages",
+        "instagram_business_manage_comments",
+        "instagram_business_content_publish",
+        "instagram_business_manage_insights",
       ].join(",");
 
       const url =
-        `https://www.instagram.com/oauth/authorize` +
-        `?client_id=${INSTAGRAM_CLIENT_ID}` +
+        `https://www.instagram.com/oauth/authorize?` +
+        `client_id=${INSTAGRAM_CLIENT_ID}` +
         `&redirect_uri=${encodeURIComponent(INSTAGRAM_REDIRECT_URI)}` +
         `&scope=${encodeURIComponent(scope)}` +
         `&response_type=code` +
-        `&state=${encodeURIComponent(state)}`;
+        `&state=${encodeURIComponent(state)}` +
+        `&enable_fb_login=0&force_authentication=1`;
 
       return res.redirect(url);
     } catch (err) {
